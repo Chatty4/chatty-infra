@@ -1421,7 +1421,7 @@ Stop push notifications for this browser.
 <a id="events"></a>
 # Events (Redis)
 
-chatty-core publishes 5 events on Redis pub/sub, only after its transaction commits. The envelope and payloads are agreed in D-06; the full schemas belong in `docs/core-events.md` (CHAT-138).
+chatty-core publishes 5 events on Redis pub/sub, only after its transaction commits. The envelope and payloads are agreed in D-06 and D-08; the full schemas are in [core-events.md](core-events.md). The Redis channel is `core.events`.
 
 ```json
 {
