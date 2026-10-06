@@ -812,7 +812,7 @@ Every change in a channel is one event with the next `seq` of that channel. The 
 }
 ```
 
-**Client rule:** ignore if `seq` <= last seen. If `seq` > last seen + 1, call `POST /sync`.
+**Client rule:** ignore if `seq` <= last seen. If `seq` > last seen + 1, call [GET /channels/{channel_id}/events](#get-channels-channel_id-events) with `after_seq` = last seen. After a reconnect, call [POST /sync](#post-sync). The full rules are in [events.md](events.md#client-rules).
 
 <a id="event-message-created"></a>
 ## message.created
