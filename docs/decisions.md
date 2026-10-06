@@ -79,3 +79,16 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
   ```
 - **Why:** chatty-chat needs `team_id` for per-team presence and unread counts, the roles for D-05, `public_channel_ids` to let team members read public channels they haven't joined, and `is_active` to block deactivated users. One cached call covers everything.
 - **Plan impact:** none (CHAT-170 "GET /internal/users/{id}/memberships").
+
+## D-08: How Redis events are sent and recovered
+- **Status:** proposed
+- **Decision:**
+  - chatty-core publishes all 5 events of D-06 on one Redis pub/sub channel, `core.events`.
+  - `team.member.changed` always has `role`: the new role, or `null` for `left` and `removed`.
+  - `channel.updated` always has `name`, `topic` and `archived`, not only the changed ones.
+  - `membership.changed` with `action: settings` carries no values. chatty-chat reloads them from `/internal/users/{id}/memberships`.
+  - Every time chatty-chat subscribes to `core.events` (start and reconnect), it deletes all its `members:*` and `channel:*` cache keys. The 5-minute TTL stays as a backstop.
+  - If publishing fails, chatty-core logs the error and the request still succeeds.
+- **Why:** Pub/sub is the simplest option for 2 services and drops events only while chatty-chat is not subscribed, which the cache reset covers. Fixed shapes mean chatty-chat has no optional keys to check.
+- **Rejected:** Redis Streams (acks, consumer groups and trimming, about +1 day across both services).
+- **Plan impact:** none (CHAT-138 "Write docs/core-events.md", CHAT-172 publish, CHAT-187 consume).
