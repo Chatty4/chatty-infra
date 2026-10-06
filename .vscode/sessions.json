@@ -1,0 +1,91 @@
+{
+    "$schema": "https://cdn.statically.io/gh/nguyenngoclongdev/cdn/main/schema/v11/terminal-keeper.json",
+    "theme": "tribe",
+    "active": "chatty",
+    "activateOnStartup": true,
+    "keepExistingTerminals": true,
+    "sessions": {
+        "chatty": [
+            {
+                "name": "infra",
+                "autoExecuteCommands": true,
+                "icon": "server",
+                "color": "terminal.ansiRed",
+                "commands": [
+                    "docker compose ps"
+                ]
+            },
+            {
+                "name": "core",
+                "autoExecuteCommands": true,
+                "icon": "package",
+                "color": "terminal.ansiGreen",
+                "commands": [
+                    "cd ..\\chatty-core; & .venv\\Scripts\\Activate.ps1"
+                ]
+            },
+            {
+                "name": "core-db",
+                "autoExecuteCommands": true,
+                "icon": "database",
+                "color": "terminal.ansiGreen",
+                "commands": [
+                    "pgcli -h 127.0.0.1 -p 5432 -U core_user -d core_db"
+                ]
+            },
+            {
+                "name": "chat",
+                "autoExecuteCommands": true,
+                "icon": "comment-discussion",
+                "color": "terminal.ansiBlue",
+                "commands": [
+                    "cd ..\\chatty-chat; & .venv\\Scripts\\Activate.ps1"
+                ]
+            },
+            {
+                "name": "chat-db",
+                "autoExecuteCommands": true,
+                "icon": "database",
+                "color": "terminal.ansiBlue",
+                "commands": [
+                    "pgcli -h 127.0.0.1 -p 5433 -U chat_user -d chat_db"
+                ]
+            },
+            {
+                "name": "web",
+                "autoExecuteCommands": true,
+                "icon": "browser",
+                "color": "terminal.ansiBrightGreen",
+                "commands": [
+                    "cd ..\\chatty-web"
+                ]
+            },
+            {
+                "name": "redis",
+                "autoExecuteCommands": true,
+                "icon": "zap",
+                "color": "terminal.ansiMagenta",
+                "commands": [
+                    "docker exec -it chatty-redis redis-cli"
+                ]
+            },
+            {
+                "name": "kafka",
+                "autoExecuteCommands": false,
+                "icon": "pulse",
+                "color": "terminal.ansiYellow",
+                "commands": [
+                    "docker exec -it chatty-kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic chat.events --property print.key=true"
+                ]
+            },
+            {
+                "name": "root",
+                "autoExecuteCommands": true,
+                "icon": "terminal",
+                "commands": [
+                    "cd .."
+                ]
+            }
+        ]
+    }
+}
