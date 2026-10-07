@@ -1,0 +1,8 @@
+# cmd.exe misreads labels and GOTOs in batch files with LF-only line endings ("The system cannot
+# find the batch label specified"), so .bat files are always checked out with CRLF.
+*.bat   text eol=crlf
+
+# Files that run in Linux (CI runners, containers) keep LF, whatever core.autocrlf says.
+*.sh    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf

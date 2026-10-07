@@ -97,6 +97,36 @@ services:
       retries: 10
       start_period: 20s
 
+  # chatty-core (Django, ASGI), built from ../chatty-core. The code is mounted, so --reload picks up changes.
+  # No migrate on start: core_db must not be migrated before the custom User model exists.
+  # The health check comes from chatty-core's Dockerfile (GET /health).
+  core:
+    build: ../chatty-core
+    image: chatty-core:dev
+    # chatty-chat calls http://chatty-core:8000/internal/... (api-internal.md), so the name is fixed.
+    container_name: chatty-core
+    command: uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - path: ../chatty-core/.env
+        required: false
+    environment:
+      # Service names and ports inside the network; these win over chatty-core/.env.
+      DATABASE_URL: postgres://${CORE_DB_USER:-core_user}:${CORE_DB_PASSWORD:-core_pass}@core-db:5432/${CORE_DB_NAME:-core_db}
+      SECRET_KEY: ${CORE_SECRET_KEY:-dev-only-not-secret}
+      DEBUG: "True"
+      # chatty-core is the Host header on calls from chatty-chat; Django rejects hosts not listed here.
+      ALLOWED_HOSTS: localhost,127.0.0.1,chatty-core,core
+      CORE_SERVICE_TOKEN: ${CORE_SERVICE_TOKEN:-change-me}
+      # File change events don't reach Linux containers from Windows mounts; poll instead.
+      WATCHFILES_FORCE_POLLING: "true"
+    ports:
+      - "127.0.0.1:${CORE_API_PORT:-8000}:8000"
+    volumes:
+      - ../chatty-core:/app
+    depends_on:
+      core-db:
+        condition: service_healthy
+
   # chatty-chat (FastAPI), built from ../chatty-chat. The code is mounted, so --reload picks up changes.
   chat:
     build: ../chatty-chat
