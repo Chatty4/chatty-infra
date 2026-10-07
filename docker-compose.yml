@@ -97,6 +97,32 @@ services:
       retries: 10
       start_period: 20s
 
+  # chatty-chat (FastAPI), built from ../chatty-chat. The code is mounted, so --reload picks up changes.
+  chat:
+    build: ../chatty-chat
+    image: chatty-chat:dev
+    container_name: chatty-chat
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+    env_file:
+      - path: ../chatty-chat/.env
+        required: false
+    environment:
+      # Service names and ports inside the network; these win over chatty-chat/.env.
+      DATABASE_URL: postgresql+asyncpg://${CHAT_DB_USER:-chat_user}:${CHAT_DB_PASSWORD:-chat_pass}@chat-db:5432/${CHAT_DB_NAME:-chat_db}
+      REDIS_URL: redis://redis:6379/0
+      CORE_SERVICE_TOKEN: ${CORE_SERVICE_TOKEN:-change-me}
+      # File change events don't reach Linux containers from Windows mounts; poll instead.
+      WATCHFILES_FORCE_POLLING: "true"
+    ports:
+      - "127.0.0.1:${CHAT_API_PORT:-8001}:8001"
+    volumes:
+      - ../chatty-chat:/app
+    depends_on:
+      chat-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   core-db-data:
   chat-db-data:
