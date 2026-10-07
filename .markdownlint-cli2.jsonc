@@ -1,0 +1,9 @@
+// markdownlint for the contract docs. Only rules we enforce are on; turn more on one by one.
+{
+  "config": {
+    "default": false,
+    // Links to #anchors must point at a heading that exists. Renaming a heading breaks them silently.
+    "MD051": true
+  },
+  "globs": ["docs/**/*.md", "README.md"]
+}
