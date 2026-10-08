@@ -106,15 +106,47 @@ Every error has the same body:
   }
 }
 ```
-- `fields` is only present for `validation_error`.
+- `fields` is only present for `validation_error`. It maps a field to a reason, see
+  [Field reasons](#field-reasons).
+- `request_id` is only present for `internal_error`.
 
 | Status | code | When |
 |---|---|---|
 | 400 | `validation_error` | a field is missing, has the wrong type or breaks a limit |
+| 400 | `parse_error` | the request body is not valid JSON |
 | 401 | `unauthorized` | no token, a bad signature, or the access token expired |
 | 403 | `user_inactive` | the user was deactivated by a platform admin |
-| 429 | `rate_limited` | too many requests; the `Retry-After` header says when to try again |
-| 500 | `internal_error` | a bug; the response has a `request_id` to find it in the logs |
+| 404 | `not_found` | the URL does not exist |
+| 405 | `method_not_allowed` | the endpoint does not accept this HTTP method |
+| 406 | `not_acceptable` | the `Accept` header asks for something other than JSON |
+| 415 | `unsupported_media_type` | the request body is not JSON |
+| 429 | `rate_limited` | too many requests |
+| 500 | `internal_error` | a bug; `error.request_id` finds it in the logs |
+
+- Every `429` (`rate_limited` and `too_many_attempts`) has a `Retry-After` header with the seconds to wait.
+- A `500` hides the details. The body only has `code`, `message` and `request_id`.
+
+<a id="field-reasons"></a>
+### Field reasons
+
+`fields` has one reason per field, the first one that failed. Nested fields use dots
+(`address.city`), items of a list use their index (`items.0.name`). An error that belongs to no
+field uses the key `non_field_errors`.
+
+| reason | When |
+|---|---|
+| `required` | the field is missing |
+| `null` | the field is `null` but must have a value |
+| `blank` | the field is an empty string |
+| `invalid` | wrong type or format, for example a bad email |
+| `too_long` | longer than the maximum |
+| `too_short` | shorter than the minimum |
+| `password_too_short` | the password is shorter than 10 characters |
+| `password_too_common` | the password is in the list of common passwords |
+| `password_entirely_numeric` | the password is only digits |
+| `password_too_similar` | the password is too similar to the email or name |
+
+The web app must treat a reason it does not know as `invalid`.
 
 The errors below each endpoint are only the ones specific to it.
 
