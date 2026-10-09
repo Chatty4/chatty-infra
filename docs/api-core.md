@@ -71,7 +71,7 @@ Source: the chatty-core Confluence page (section 4) and `docs/decisions.md`. If 
 ## Authorization
 
 **Getting tokens**
-- [POST /auth/register](#post-auth-register) and [POST /auth/login](#post-auth-login) return an `access_token` and a `refresh_token`.
+- [POST /auth/login](#post-auth-login) returns an `access_token` and a `refresh_token`. [POST /auth/register](#post-auth-register) does not log in.
 - The access token is a JWT signed by chatty-core with RS256. It lives 15 minutes. Claims: `sub` (user id), `iat`, `exp`, `jti`. It has no teams or roles; those are checked on every request.
 - The refresh token lives 30 days and is rotated on every refresh: the old one stops working.
 - The same access token is used for chatty-chat, which checks it with chatty-core's public key.
@@ -190,6 +190,7 @@ Not paginated, because their size has a limit: `GET /teams` (the user's teams), 
 <a id="post-auth-register"></a>
 ## POST /auth/register
 Create an account. The new user has no teams yet. Joining a team happens with an invite.
+Register does not log in: the client calls [POST /auth/login](#post-auth-login) next.
 
 **Auth:** none
 
@@ -210,18 +211,11 @@ Create an account. The new user has no teams yet. Joining a team happens with an
 **Response 201**
 ```json
 {
-  "access_token": "eyJhbGciOiJSUzI1NiIs…",
-  "token_type": "Bearer",
-  "expires_in": 900,
-  "refresh_token": "rt_8Hq2…",
-  "refresh_expires_in": 2592000,
-  "user": {
-    "id": "u7…",
-    "email": "ana@example.com",
-    "display_name": "Ana Pop",
-    "avatar_file_id": null,
-    "timezone": "UTC"
-  }
+  "id": "u7…",
+  "email": "ana@example.com",
+  "display_name": "Ana Pop",
+  "avatar_file_id": null,
+  "timezone": "UTC"
 }
 ```
 
