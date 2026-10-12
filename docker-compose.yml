@@ -106,7 +106,7 @@ services:
     # chatty-chat calls http://chatty-core:8000/internal/... (api-internal.md), so the name is fixed.
     container_name: chatty-core
     command: >-
-      sh -c "python -c 'from cryptography.hazmat.primitives.asymmetric import rsa; from cryptography.hazmat.primitives import serialization; key = rsa.generate_private_key(public_exponent=65537, key_size=2048); open(\"/tmp/jwt_private.pem\",\"wb\").write(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL, serialization.NoEncryption()))' && uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload"
+      sh -c "python -c 'from cryptography.hazmat.primitives.asymmetric import rsa; from cryptography.hazmat.primitives import serialization; key = rsa.generate_private_key(public_exponent=65537, key_size=2048); open(\"/tmp/jwt_private.pem\",\"wb\").write(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL, serialization.NoEncryption())); open(\"/tmp/jwt_public.pem\",\"wb\").write(key.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo))' && uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload"
     env_file:
       - path: ../chatty-core/.env
         required: false
@@ -115,6 +115,7 @@ services:
       DATABASE_URL: postgres://${CORE_DB_USER:-core_user}:${CORE_DB_PASSWORD:-core_pass}@core-db:5432/${CORE_DB_NAME:-core_db}
       REDIS_URL: redis://redis:6379/0
       JWT_PRIVATE_KEY_PATH: /tmp/jwt_private.pem
+      JWT_PUBLIC_KEY_PATH: /tmp/jwt_public.pem
       SECRET_KEY: ${CORE_SECRET_KEY:-dev-only-not-secret}
       DEBUG: "True"
       # chatty-core is the Host header on calls from chatty-chat; Django rejects hosts not listed here.
