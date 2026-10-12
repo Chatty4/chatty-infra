@@ -92,3 +92,10 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
 - **Why:** Pub/sub is the simplest option for 2 services and drops events only while chatty-chat is not subscribed, which the cache reset covers. Fixed shapes mean chatty-chat has no optional keys to check.
 - **Rejected:** Redis Streams (acks, consumer groups and trimming, about +1 day across both services).
 - **Plan impact:** none (CHAT-138 "Write docs/core-events.md", CHAT-172 publish, CHAT-187 consume).
+
+## D-09: Client IP for rate limits
+- **Status:** proposed
+- **Decision:** In production, chatty-core and chatty-chat are reachable only through chatty-web's Nginx. Nginx sets `X-Real-IP` to the client's address, overwriting any value the client sent. The services read `X-Real-IP` only when `BEHIND_PROXY=True`; otherwise they use the socket address (`REMOTE_ADDR`). Local development keeps `BEHIND_PROXY=False`.
+- **Why:** Behind a proxy every request has the proxy's IP, so all users would share one rate limit (`register:{ip}`, `login_fail:{ip}`). A client can fake any header, so only a value the proxy overwrites is trusted.
+- **Rejected:** counting hops in `X-Forwarded-For` (more code, and wrong as soon as a proxy is added or removed, or when a client reaches the backend directly).
+- **Plan impact:** none in days (CHAT-240).
