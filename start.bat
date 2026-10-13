@@ -78,11 +78,6 @@ if errorlevel 1 (
 echo.
 call "%LIB%" :status_table
 echo.
-call "%LIB%" :is_running core
-if not errorlevel 1 (
-    call "%LIB%" :core_has_user_model
-    if errorlevel 1 call "%LIB%" :hint "core_db is not migrated on purpose until the custom User model exists. See migrate.bat."
-)
 call "%LIB%" :hint "Next: logs.bat to follow logs, migrate.bat for migrations, stop.bat to stop."
 call "%LIB%" :finish
 exit /b 0
