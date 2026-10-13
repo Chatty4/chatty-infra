@@ -6,7 +6,8 @@
 ::   2. Run C:\chatty\chatty-infra\setup.bat
 ::
 :: It clones the other repos next to chatty-infra on the dev branch, creates every .env from its
-:: .env.example with matching secrets, and can create the Python virtualenvs and start the stack.
+:: .env.example with matching secrets, creates the JWT key pair once, and can create the Python
+:: virtualenvs and start the stack.
 :: It never overwrites a .env value you have already set, and never touches a repo with changes.
 ::
 ::   setup.bat            asks at every step
@@ -39,7 +40,7 @@ echo   Clone from: %C_BOLD%!REMOTE_BASE!%C_RESET%   branch: %C_BOLD%%BRANCH%%C_R
 echo.
 
 :: ---- 1. Tools -------------------------------------------------------------------------------
-call "%LIB%" :step 1 6 "Checking tools"
+call "%LIB%" :step 1 7 "Checking tools"
 where git >nul 2>&1
 if errorlevel 1 (
     call "%LIB%" :err "git is not installed. Get it from https://git-scm.com/download/win"
@@ -70,11 +71,11 @@ if errorlevel 1 (
 )
 
 :: ---- 2. Repos -------------------------------------------------------------------------------
-call "%LIB%" :step 2 6 "Cloning the repos"
+call "%LIB%" :step 2 7 "Cloning the repos"
 for %%r in (%REPOS%) do call :repo %%r
 
 :: ---- 3. .env files --------------------------------------------------------------------------
-call "%LIB%" :step 3 6 "Creating .env files"
+call "%LIB%" :step 3 7 "Creating .env files"
 call :env_file "%ROOT%" chatty-infra
 call :env_file "%CORE_DIR%" chatty-core
 call :env_file "%CHAT_DIR%" chatty-chat
@@ -95,8 +96,12 @@ if exist "%ROOT%\.env" (
 if exist "%CHAT_DIR%\.env" call :set_env "%CHAT_DIR%\.env" chatty-chat CORE_SERVICE_TOKEN !NEW_TOKEN!
 if exist "%CORE_DIR%\.env" call :set_env "%CORE_DIR%\.env" chatty-core SECRET_KEY !NEW_SECRET!
 
-:: ---- 4. VS Code workspace -------------------------------------------------------------------
-call "%LIB%" :step 4 6 "VS Code workspace"
+:: ---- 4. JWT keys ----------------------------------------------------------------------------
+call "%LIB%" :step 4 7 "JWT keys"
+call :jwt_keys
+
+:: ---- 5. VS Code workspace -------------------------------------------------------------------
+call "%LIB%" :step 5 7 "VS Code workspace"
 set "WS_FILE=%WORKSPACE%\chatty.code-workspace"
 if exist "%WS_FILE%" (
     call "%LIB%" :ok "chatty.code-workspace already exists."
@@ -117,8 +122,8 @@ if exist "%WS_FILE%" (
     call "%LIB%" :ok "Created chatty.code-workspace next to the repos."
 )
 
-:: ---- 5. Virtualenvs and packages ------------------------------------------------------------
-call "%LIB%" :step 5 6 "Local virtualenvs and packages"
+:: ---- 6. Virtualenvs and packages ------------------------------------------------------------
+call "%LIB%" :step 6 7 "Local virtualenvs and packages"
 if "%INTERACTIVE%"=="0" (
     call "%LIB%" :info "Skipped with --yes. Run setup.bat again without it to create them."
 ) else (
@@ -128,8 +133,8 @@ if "%INTERACTIVE%"=="0" (
     call :web_packages
 )
 
-:: ---- 6. Start -------------------------------------------------------------------------------
-call "%LIB%" :step 6 6 "Start the stack"
+:: ---- 7. Start -------------------------------------------------------------------------------
+call "%LIB%" :step 7 7 "Start the stack"
 if "%INTERACTIVE%"=="0" (
     call "%LIB%" :info "Skipped with --yes. Run start.bat when you're ready."
 ) else (
@@ -233,6 +238,59 @@ if "!_res!"=="set" (
 ) else (
     call "%LIB%" :warn "%~2\.env: could not set %~3."
     set "WARNINGS=1"
+)
+exit /b 0
+
+:jwt_keys
+:: One key pair per developer in chatty-core\keys: core signs with the private key, chat gets the
+:: public one. Never regenerated when it exists: a new pair logs everyone out.
+set "_keys=%CORE_DIR%\keys"
+if not exist "%CORE_DIR%" (
+    call "%LIB%" :warn "chatty-core is not cloned, skipping the JWT keys."
+    set "WARNINGS=1"
+    exit /b 0
+)
+where docker >nul 2>&1
+if errorlevel 1 (
+    call "%LIB%" :warn "Docker is needed for the JWT keys. Install it and run setup.bat again."
+    set "WARNINGS=1"
+    exit /b 0
+)
+:: Starting chat before the keys existed makes Docker Desktop create an empty folder named
+:: jwt_public.pem in their place. Remove those, so they don't count as keys below.
+for %%f in (jwt_private.pem jwt_public.pem) do if exist "!_keys!\%%f\" rmdir "!_keys!\%%f" 2>nul
+set "_have=0"
+if exist "!_keys!\jwt_private.pem" if exist "!_keys!\jwt_public.pem" set "_have=1"
+if "!_have!"=="1" (
+    call "%LIB%" :ok "chatty-core\keys: JWT keys already exist, kept."
+) else (
+    if not exist "!_keys!" mkdir "!_keys!"
+    docker run --rm -v "!_keys!:/keys" alpine/openssl:3.5.9 genrsa -out /keys/jwt_private.pem 2048 >nul 2>&1
+    docker run --rm -v "!_keys!:/keys" alpine/openssl:3.5.9 rsa -in /keys/jwt_private.pem -pubout -out /keys/jwt_public.pem >nul 2>&1
+    if not exist "!_keys!\jwt_public.pem" (
+        call "%LIB%" :err "Could not create the JWT keys. Is Docker Desktop running?"
+        set "WARNINGS=1"
+        exit /b 0
+    )
+    call "%LIB%" :ok "chatty-core\keys: JWT keys created."
+)
+:: openssl writes the private key as root with mode 600. The core and chat containers run as uid 1000,
+:: so hand both files to that user. Also fixes keys made earlier with the chatty-core README commands.
+docker run --rm -v "!_keys!:/keys" --entrypoint sh alpine/openssl:3.5.9 -c "chown 1000:1000 /keys/jwt_private.pem /keys/jwt_public.pem" >nul 2>&1
+if errorlevel 1 (
+    call "%LIB%" :warn "Could not hand the JWT keys to the container user. chatty-core may fail to read them."
+    set "WARNINGS=1"
+)
+
+:: For running chatty-chat outside Docker. In Docker, chat mounts the file from chatty-core.
+if not exist "%CHAT_DIR%" exit /b 0
+if not exist "%CHAT_DIR%\keys" mkdir "%CHAT_DIR%\keys"
+copy /y "!_keys!\jwt_public.pem" "%CHAT_DIR%\keys\jwt_public.pem" >nul
+if errorlevel 1 (
+    call "%LIB%" :warn "Could not copy the public key to chatty-chat\keys."
+    set "WARNINGS=1"
+) else (
+    call "%LIB%" :ok "chatty-chat\keys: public key copied from chatty-core."
 )
 exit /b 0
 
