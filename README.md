@@ -44,8 +44,8 @@ asks, and with arguments it runs without questions (see the top of each file).
 | `shell.bat` | Django shell, bash, psql, redis-cli, MinIO console | `shell.bat psql-core`, `shell.bat redis` |
 | `reset-db.bat` | Wipe `core_db`, `chat_db` or every volume; backs up to `backups\` first | always asks |
 
-`migrate.bat` won't migrate `core_db` before chatty-core has its custom User model, as chatty-core's
-`CLAUDE.md` asks. Set `NO_COLOR=1` to turn off colors.
+The core and chat containers apply pending migrations every time they start, so `migrate.bat` is for
+everything else: status, new migrations, checks and rollbacks. Set `NO_COLOR=1` to turn off colors.
 
 ## Services and ports
 
