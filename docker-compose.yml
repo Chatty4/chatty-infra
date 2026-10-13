@@ -50,7 +50,10 @@ services:
 
   minio:
     # minio/minio is no longer published on Docker Hub or Quay; Chainguard builds MinIO from source.
-    image: cgr.dev/chainguard/minio:latest
+    # Chainguard's free images only have a "latest" tag, so it is pinned by digest. Update on purpose:
+    # docker buildx imagetools inspect cgr.dev/chainguard/minio:latest  (copy the top-level Digest)
+    # Pinned: MinIO RELEASE.2026-09-22T19-25-18Z, multi-arch index (amd64, arm64).
+    image: cgr.dev/chainguard/minio:latest@sha256:a05a4497e8dce3cb7a7a1bf1872ba5d30ea988f1e8c22c9e0920503761c4b5f1
     container_name: chatty-minio
     command: server /data --console-address ":9001"
     environment:
