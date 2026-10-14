@@ -346,7 +346,7 @@ Change the password. All other devices are logged out (their refresh tokens are 
   "refresh_token": "rt_N4ka…"
 }
 ```
-- `refresh_token`: this device's token, the one that is not revoked
+- `refresh_token`: this device's token, the one that is not revoked. It is checked before anything changes; if it is rejected, the password and all sessions stay as they were.
 - `new_password`: same rules as register, and different from the old one
 
 **Response 204** (no body)
@@ -356,6 +356,8 @@ Change the password. All other devices are logged out (their refresh tokens are 
 |---|---|---|
 | 400 | `validation_error` | new password too weak or the same as the old one |
 | 400 | `wrong_password` | `old_password` is wrong |
+| 401 | `invalid_refresh_token` | `refresh_token` is unknown, expired or revoked |
+| 403 | `forbidden` | `refresh_token` belongs to another user |
 
 ---
 
