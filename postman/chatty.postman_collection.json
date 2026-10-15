@@ -1,10 +1,10 @@
 {
   "info": {
-    "name": "chatty-core",
+    "name": "chatty",
+    "description": "All routes in chatty-core and chatty-chat.\n\n1. Select the \"Chatty local\" environment (chatty-local.postman_environment.json).\n2. Run Auth > register once, then login. Login saves access_token and refresh_token.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://127.0.0.1:8000" },
     { "key": "access_token", "value": "" },
     { "key": "refresh_token", "value": "" },
     { "key": "team_id", "value": "" },
@@ -13,13 +13,25 @@
   ],
   "item": [
     {
-      "name": "Health",
+      "name": "Core health",
       "item": [
         {
           "name": "GET /health",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/health"
+            "url": "{{core_url}}/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chat health",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "url": "{{chat_url}}/health"
           }
         }
       ]
@@ -31,11 +43,11 @@
           "name": "POST /auth/register",
           "request": {
             "method": "POST",
-            "url": "{{base_url}}/api/core/v1/auth/register",
+            "url": "{{core_url}}/api/core/v1/auth/register",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"ana@example.com\",\n  \"display_name\": \"Ana Pop\",\n  \"password\": \"correct horse battery\"\n}"
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"display_name\": \"{{display_name}}\",\n  \"password\": \"{{password}}\"\n}"
             }
           }
         },
@@ -55,11 +67,11 @@
           ],
           "request": {
             "method": "POST",
-            "url": "{{base_url}}/api/core/v1/auth/login",
+            "url": "{{core_url}}/api/core/v1/auth/login",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"ana@example.com\",\n  \"password\": \"correct horse battery\"\n}"
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
             }
           }
         },
@@ -79,7 +91,7 @@
           ],
           "request": {
             "method": "POST",
-            "url": "{{base_url}}/api/core/v1/auth/refresh",
+            "url": "{{core_url}}/api/core/v1/auth/refresh",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
@@ -89,16 +101,31 @@
         },
         {
           "name": "POST /auth/password (change password)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// swap so login keeps working and the next run changes it back",
+                  "if (pm.response.code === 204) {",
+                  "    var old = pm.environment.get('password');",
+                  "    pm.environment.set('password', pm.environment.get('new_password'));",
+                  "    pm.environment.set('new_password', old);",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
-            "url": "{{base_url}}/api/core/v1/auth/password",
+            "url": "{{core_url}}/api/core/v1/auth/password",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{access_token}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"old_password\": \"correct horse battery\",\n  \"new_password\": \"new correct horse battery\",\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+              "raw": "{\n  \"old_password\": \"{{password}}\",\n  \"new_password\": \"{{new_password}}\",\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
             }
           }
         },
@@ -106,7 +133,7 @@
           "name": "POST /auth/logout",
           "request": {
             "method": "POST",
-            "url": "{{base_url}}/api/core/v1/auth/logout",
+            "url": "{{core_url}}/api/core/v1/auth/logout",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{access_token}}" }
@@ -126,7 +153,7 @@
           "name": "GET /me",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/api/core/v1/me",
+            "url": "{{core_url}}/api/core/v1/me",
             "header": [
               { "key": "Authorization", "value": "Bearer {{access_token}}" }
             ]
@@ -136,7 +163,7 @@
           "name": "PUT /me",
           "request": {
             "method": "PUT",
-            "url": "{{base_url}}/api/core/v1/me",
+            "url": "{{core_url}}/api/core/v1/me",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{access_token}}" }
@@ -156,7 +183,7 @@
           "name": "GET /teams",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/api/core/v1/teams",
+            "url": "{{core_url}}/api/core/v1/teams",
             "header": [
               { "key": "Authorization", "value": "Bearer {{access_token}}" }
             ]
@@ -178,7 +205,7 @@
           ],
           "request": {
             "method": "POST",
-            "url": "{{base_url}}/api/core/v1/teams",
+            "url": "{{core_url}}/api/core/v1/teams",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{access_token}}" }
@@ -194,8 +221,8 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/api/core/v1/teams/:team_id",
-              "host": ["{{base_url}}"],
+              "raw": "{{core_url}}/api/core/v1/teams/:team_id",
+              "host": ["{{core_url}}"],
               "path": ["api", "core", "v1", "teams", ":team_id"],
               "variable": [
                 { "key": "team_id", "value": "{{team_id}}" }
@@ -211,8 +238,8 @@
           "request": {
             "method": "PUT",
             "url": {
-              "raw": "{{base_url}}/api/core/v1/teams/:team_id",
-              "host": ["{{base_url}}"],
+              "raw": "{{core_url}}/api/core/v1/teams/:team_id",
+              "host": ["{{core_url}}"],
               "path": ["api", "core", "v1", "teams", ":team_id"],
               "variable": [
                 { "key": "team_id", "value": "{{team_id}}" }
@@ -233,8 +260,8 @@
           "request": {
             "method": "DELETE",
             "url": {
-              "raw": "{{base_url}}/api/core/v1/teams/:team_id",
-              "host": ["{{base_url}}"],
+              "raw": "{{core_url}}/api/core/v1/teams/:team_id",
+              "host": ["{{core_url}}"],
               "path": ["api", "core", "v1", "teams", ":team_id"],
               "variable": [
                 { "key": "team_id", "value": "{{team_id}}" }
@@ -250,8 +277,8 @@
           "request": {
             "method": "POST",
             "url": {
-              "raw": "{{base_url}}/api/core/v1/teams/:team_id/leave",
-              "host": ["{{base_url}}"],
+              "raw": "{{core_url}}/api/core/v1/teams/:team_id/leave",
+              "host": ["{{core_url}}"],
               "path": ["api", "core", "v1", "teams", ":team_id", "leave"],
               "variable": [
                 { "key": "team_id", "value": "{{team_id}}" }
@@ -267,8 +294,8 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/api/core/v1/teams/:team_id/members",
-              "host": ["{{base_url}}"],
+              "raw": "{{core_url}}/api/core/v1/teams/:team_id/members",
+              "host": ["{{core_url}}"],
               "path": ["api", "core", "v1", "teams", ":team_id", "members"],
               "variable": [
                 { "key": "team_id", "value": "{{team_id}}" }
@@ -284,8 +311,8 @@
           "request": {
             "method": "PUT",
             "url": {
-              "raw": "{{base_url}}/api/core/v1/teams/:team_id/members/:user_id",
-              "host": ["{{base_url}}"],
+              "raw": "{{core_url}}/api/core/v1/teams/:team_id/members/:user_id",
+              "host": ["{{core_url}}"],
               "path": ["api", "core", "v1", "teams", ":team_id", "members", ":user_id"],
               "variable": [
                 { "key": "team_id", "value": "{{team_id}}" },
@@ -307,13 +334,99 @@
           "request": {
             "method": "DELETE",
             "url": {
-              "raw": "{{base_url}}/api/core/v1/teams/:team_id/members/:user_id",
-              "host": ["{{base_url}}"],
+              "raw": "{{core_url}}/api/core/v1/teams/:team_id/members/:user_id",
+              "host": ["{{core_url}}"],
               "path": ["api", "core", "v1", "teams", ":team_id", "members", ":user_id"],
               "variable": [
                 { "key": "team_id", "value": "{{team_id}}" },
                 { "key": "user_id", "value": "{{user_id}}" }
               ]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Channels",
+      "item": [
+        {
+          "name": "GET /teams/:team_id/channels",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/teams/:team_id/channels",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "teams", ":team_id", "channels"],
+              "variable": [{ "key": "team_id", "value": "{{team_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        },
+        {
+          "name": "POST /teams/:team_id/channels",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var body = pm.response.json();",
+                  "if (body.id) pm.collectionVariables.set('channel_id', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/teams/:team_id/channels",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "teams", ":team_id", "channels"],
+              "variable": [{ "key": "team_id", "value": "{{team_id}}" }]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"random\",\n  \"kind\": \"public\",\n  \"topic\": \"\"\n}"
+            }
+          }
+        },
+        {
+          "name": "GET /teams/:team_id/channels/browse",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/teams/:team_id/channels/browse?limit=50",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "teams", ":team_id", "channels", "browse"],
+              "query": [
+                { "key": "limit", "value": "50" },
+                { "key": "q", "value": "", "disabled": true },
+                { "key": "cursor", "value": "", "disabled": true }
+              ],
+              "variable": [{ "key": "team_id", "value": "{{team_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        },
+        {
+          "name": "GET /channels/:channel_id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/channels/:channel_id",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "channels", ":channel_id"],
+              "variable": [{ "key": "channel_id", "value": "{{channel_id}}" }]
             },
             "header": [
               { "key": "Authorization", "value": "Bearer {{access_token}}" }
