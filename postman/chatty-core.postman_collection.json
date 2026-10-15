@@ -8,7 +8,8 @@
     { "key": "access_token", "value": "" },
     { "key": "refresh_token", "value": "" },
     { "key": "team_id", "value": "" },
-    { "key": "channel_id", "value": "" }
+    { "key": "channel_id", "value": "" },
+    { "key": "user_id", "value": "" }
   ],
   "item": [
     {
@@ -186,6 +187,137 @@
               "mode": "raw",
               "raw": "{\n  \"name\": \"Backend\"\n}"
             }
+          }
+        },
+        {
+          "name": "GET /teams/:team_id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/core/v1/teams/:team_id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "core", "v1", "teams", ":team_id"],
+              "variable": [
+                { "key": "team_id", "value": "{{team_id}}" }
+              ]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        },
+        {
+          "name": "PUT /teams/:team_id",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{base_url}}/api/core/v1/teams/:team_id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "core", "v1", "teams", ":team_id"],
+              "variable": [
+                { "key": "team_id", "value": "{{team_id}}" }
+              ]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Backend\",\n  \"icon_file_id\": null\n}"
+            }
+          }
+        },
+        {
+          "name": "DELETE /teams/:team_id",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/api/core/v1/teams/:team_id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "core", "v1", "teams", ":team_id"],
+              "variable": [
+                { "key": "team_id", "value": "{{team_id}}" }
+              ]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        },
+        {
+          "name": "POST /teams/:team_id/leave",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/core/v1/teams/:team_id/leave",
+              "host": ["{{base_url}}"],
+              "path": ["api", "core", "v1", "teams", ":team_id", "leave"],
+              "variable": [
+                { "key": "team_id", "value": "{{team_id}}" }
+              ]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        },
+        {
+          "name": "GET /teams/:team_id/members",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/core/v1/teams/:team_id/members",
+              "host": ["{{base_url}}"],
+              "path": ["api", "core", "v1", "teams", ":team_id", "members"],
+              "variable": [
+                { "key": "team_id", "value": "{{team_id}}" }
+              ]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        },
+        {
+          "name": "PUT /teams/:team_id/members/:user_id",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{base_url}}/api/core/v1/teams/:team_id/members/:user_id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "core", "v1", "teams", ":team_id", "members", ":user_id"],
+              "variable": [
+                { "key": "team_id", "value": "{{team_id}}" },
+                { "key": "user_id", "value": "{{user_id}}" }
+              ]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"admin\"\n}"
+            }
+          }
+        },
+        {
+          "name": "DELETE /teams/:team_id/members/:user_id",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/api/core/v1/teams/:team_id/members/:user_id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "core", "v1", "teams", ":team_id", "members", ":user_id"],
+              "variable": [
+                { "key": "team_id", "value": "{{team_id}}" },
+                { "key": "user_id", "value": "{{user_id}}" }
+              ]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
           }
         }
       ]
