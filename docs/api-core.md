@@ -650,7 +650,9 @@ Change a member's role. Publishes `team.member.changed` (`role_changed`).
 | Status | code | When |
 |---|---|---|
 | 403 | `forbidden` | I am a member, or an admin trying to make an owner or change an owner |
+| 403 | `not_a_team_member` | I am not in the team |
 | 404 | `member_not_found` | the user is not in the team |
+| 404 | `team_not_found` | the team doesn't exist or was deleted |
 | 409 | `last_owner` | the change would leave the team without an owner |
 
 ---
@@ -669,7 +671,9 @@ Remove someone from the team. They are also removed from all the team's channels
 | Status | code | When |
 |---|---|---|
 | 403 | `forbidden` | I am a member, or an admin removing an owner |
+| 403 | `not_a_team_member` | I am not in the team (also when I was removed a moment earlier) |
 | 404 | `member_not_found` | the user is not in the team |
+| 404 | `team_not_found` | the team doesn't exist or was deleted |
 | 409 | `use_leave` | the user is me |
 
 ---
