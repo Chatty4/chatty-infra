@@ -74,6 +74,8 @@ Source: the chatty-core Confluence page (section 4) and `docs/decisions.md`. If 
 - [POST /auth/login](#post-auth-login) returns an `access_token` and a `refresh_token`. [POST /auth/register](#post-auth-register) does not log in.
 - The access token is a JWT signed by chatty-core with RS256. It lives 15 minutes. Claims: `sub` (user id), `iat`, `exp`, `jti`. It has no teams or roles; those are checked on every request.
 - The refresh token lives 30 days and is rotated on every refresh: the old one stops working.
+- Logout, a password change and deactivation delete refresh tokens. Sending a deleted token returns `401 invalid_refresh_token` and changes nothing else.
+- Sending a refresh token that was already rotated counts as theft: every refresh token of the user is deleted, so every device has to log in again.
 - The same access token is used for chatty-chat, which checks it with chatty-core's public key.
 
 **Sending the token**
@@ -85,6 +87,7 @@ Source: the chatty-core Confluence page (section 4) and `docs/decisions.md`. If 
 2. The web app calls [POST /auth/refresh](#post-auth-refresh) once, then repeats the request with the new token.
 3. If the refresh returns `401 invalid_refresh_token`, the user has to log in again.
 - The web app may refresh about 1 minute before `exp` to avoid the failed request.
+- Only one refresh per refresh token. If two tabs refresh with the same token, the second one counts as reuse and logs out every device, so the web app must refresh from one tab and share the new tokens with the others.
 
 **What the user is allowed to do**
 - The **Who** line of each endpoint says who may call it. It is checked after the token, with the user's role in the team (`owner`, `admin`, `member`) and in the channel (`owner`, `member`).
@@ -274,7 +277,7 @@ Log in with email and password.
 
 <a id="post-auth-refresh"></a>
 ## POST /auth/refresh
-Get a new access token. The refresh token is rotated: the old one stops working.
+Get a new access token. The refresh token is rotated: the old one stops working. Sending an already rotated token again logs out every device (see [Authorization](#authorization)).
 
 **Auth:** none (the refresh token is sent in the body)
 
@@ -301,14 +304,14 @@ Get a new access token. The refresh token is rotated: the old one stops working.
 **Errors**
 | Status | code | When |
 |---|---|---|
-| 401 | `invalid_refresh_token` | unknown, expired or revoked refresh token |
+| 401 | `invalid_refresh_token` | unknown, expired or deleted refresh token; or one that was already rotated, and then every refresh token of the user is deleted too |
 | 403 | `user_inactive` | the user was deactivated |
 
 ---
 
 <a id="post-auth-logout"></a>
 ## POST /auth/logout
-Log out this device by revoking its refresh token. The access token keeps working until it expires (at most 15 minutes).
+Log out this device by deleting its refresh token. The access token keeps working until it expires (at most 15 minutes).
 
 **Auth:** `Authorization: Bearer <JWT>`
 
@@ -321,7 +324,7 @@ Log out this device by revoking its refresh token. The access token keeps workin
 }
 ```
 
-**Response 204** (no body). Also 204 if the token was already revoked.
+**Response 204** (no body). Also 204 if the token is unknown, already deleted or already rotated.
 
 **Errors**
 | Status | code | When |
@@ -332,7 +335,7 @@ Log out this device by revoking its refresh token. The access token keeps workin
 
 <a id="post-auth-password"></a>
 ## POST /auth/password
-Change the password. All other devices are logged out (their refresh tokens are revoked). This device stays logged in.
+Change the password. All other devices are logged out (their refresh tokens are deleted). This device stays logged in.
 
 **Auth:** `Authorization: Bearer <JWT>`
 
@@ -346,7 +349,7 @@ Change the password. All other devices are logged out (their refresh tokens are 
   "refresh_token": "rt_N4ka…"
 }
 ```
-- `refresh_token`: this device's token, the one that is not revoked. It is checked before anything changes; if it is rejected, the password and all sessions stay as they were.
+- `refresh_token`: this device's token, the one that is kept. It is checked before anything changes; if it is rejected, the password and all sessions stay as they were.
 - `new_password`: same rules as register, and different from the old one
 
 **Response 204** (no body)
@@ -356,7 +359,7 @@ Change the password. All other devices are logged out (their refresh tokens are 
 |---|---|---|
 | 400 | `validation_error` | new password too weak or the same as the old one |
 | 400 | `wrong_password` | `old_password` is wrong |
-| 401 | `invalid_refresh_token` | `refresh_token` is unknown, expired or revoked |
+| 401 | `invalid_refresh_token` | `refresh_token` is unknown, expired, deleted or already rotated |
 | 403 | `forbidden` | `refresh_token` belongs to another user |
 
 ---
