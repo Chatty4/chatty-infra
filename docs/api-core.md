@@ -1198,7 +1198,7 @@ Add people to a channel. People who are already members are skipped. Publishes `
 
 <a id="delete-channels-channel_id-members-user_id"></a>
 ## DELETE /channels/{channel_id}/members/{user_id}
-Remove someone from a channel. Publishes `membership.changed` (`removed`); chatty-chat stops sending them the channel's events right away.
+Remove someone from a channel. Publishes `membership.changed` (`removed`); chatty-chat stops sending them the channel's events right away. If they were the last owner of a private channel, the member who joined first becomes the owner, as with [leave](#post-channels-channel_id-leave).
 
 **Auth:** `Authorization: Bearer <JWT>`
 
