@@ -562,7 +562,7 @@ Delete the team. It is a soft delete: the team disappears for everyone, and a cl
 
 <a id="post-teams-team_id-leave"></a>
 ## POST /teams/{team_id}/leave
-Leave the team. I am also removed from all its channels. If I was the last owner of a private channel, the member who joined first becomes its owner. Publishes `team.member.changed` (`left`).
+Leave the team. I am also removed from all its channels, and the invites I created for it are revoked. If I was the last owner of a private channel, the member who joined first becomes its owner. Publishes `team.member.changed` (`left`).
 
 **Auth:** `Authorization: Bearer <JWT>`
 
@@ -660,7 +660,7 @@ Change a member's role. Publishes `team.member.changed` (`role_changed`).
 
 <a id="delete-teams-team_id-members-user_id"></a>
 ## DELETE /teams/{team_id}/members/{user_id}
-Remove someone from the team. They are also removed from all the team's channels. If they were the last owner of a private channel, the member who joined first becomes its owner. Publishes `team.member.changed` (`removed`).
+Remove someone from the team. They are also removed from all the team's channels, and the invites they created for it are revoked. They can still rejoin with someone else's invite (removal is not a ban). If they were the last owner of a private channel, the member who joined first becomes its owner. Publishes `team.member.changed` (`removed`).
 
 **Auth:** `Authorization: Bearer <JWT>`
 
