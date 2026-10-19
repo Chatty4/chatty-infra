@@ -771,7 +771,8 @@ Revoke an invite. The link stops working right away.
 | Status | code | When |
 |---|---|---|
 | 403 | `forbidden` | I am not the creator, an owner or an admin |
-| 404 | `invite_not_found` | the invite doesn't exist |
+| 403 | `not_a_team_member` | I am not in the invite's team |
+| 404 | `invite_not_found` | the invite doesn't exist, or its team was deleted |
 
 ---
 
