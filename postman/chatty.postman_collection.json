@@ -10,7 +10,9 @@
     { "key": "team_id", "value": "" },
     { "key": "channel_id", "value": "" },
     { "key": "user_id", "value": "" },
-    { "key": "invite_id", "value": "" }
+    { "key": "invite_id", "value": "" },
+    { "key": "invite_code", "value": "" },
+    { "key": "dm_id", "value": "" }
   ],
   "item": [
     {
@@ -295,9 +297,15 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{core_url}}/api/core/v1/teams/:team_id/members",
+              "raw": "{{core_url}}/api/core/v1/teams/:team_id/members?limit=50",
               "host": ["{{core_url}}"],
               "path": ["api", "core", "v1", "teams", ":team_id", "members"],
+              "query": [
+                { "key": "limit", "value": "50" },
+                { "key": "q", "value": "", "disabled": true },
+                { "key": "cursor", "value": "", "disabled": true },
+                { "key": "user_ids", "value": "{{user_id}}", "disabled": true, "description": "comma-separated, at most 100; no paging" }
+              ],
               "variable": [
                 { "key": "team_id", "value": "{{team_id}}" }
               ]
@@ -361,7 +369,8 @@
               "script": {
                 "exec": [
                   "var body = pm.response.json();",
-                  "if (body.id) pm.collectionVariables.set('invite_id', body.id);"
+                  "if (body.id) pm.collectionVariables.set('invite_id', body.id);",
+                  "if (body.code) pm.collectionVariables.set('invite_code', body.code);"
                 ]
               }
             }
@@ -408,6 +417,44 @@
               "host": ["{{core_url}}"],
               "path": ["api", "core", "v1", "invites", ":invite_id"],
               "variable": [{ "key": "invite_id", "value": "{{invite_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        },
+        {
+          "name": "GET /invites/:invite_code (no auth)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/invites/:invite_code",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "invites", ":invite_code"],
+              "variable": [{ "key": "invite_code", "value": "{{invite_code}}" }]
+            }
+          }
+        },
+        {
+          "name": "POST /invites/:invite_code/join",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var body = pm.response.json();",
+                  "if (body.team_id) pm.collectionVariables.set('team_id', body.team_id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/invites/:invite_code/join",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "invites", ":invite_code", "join"],
+              "variable": [{ "key": "invite_code", "value": "{{invite_code}}" }]
             },
             "header": [
               { "key": "Authorization", "value": "Bearer {{access_token}}" }
@@ -498,6 +545,204 @@
             "header": [
               { "key": "Authorization", "value": "Bearer {{access_token}}" }
             ]
+          }
+        },
+        {
+          "name": "PUT /channels/:channel_id",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/channels/:channel_id",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "channels", ":channel_id"],
+              "variable": [{ "key": "channel_id", "value": "{{channel_id}}" }]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"random\",\n  \"topic\": \"Anything goes\"\n}"
+            }
+          }
+        },
+        {
+          "name": "POST /channels/:channel_id/join",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/channels/:channel_id/join",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "channels", ":channel_id", "join"],
+              "variable": [{ "key": "channel_id", "value": "{{channel_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        },
+        {
+          "name": "POST /channels/:channel_id/leave",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/channels/:channel_id/leave",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "channels", ":channel_id", "leave"],
+              "variable": [{ "key": "channel_id", "value": "{{channel_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        },
+        {
+          "name": "POST /channels/:channel_id/archive",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/channels/:channel_id/archive",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "channels", ":channel_id", "archive"],
+              "variable": [{ "key": "channel_id", "value": "{{channel_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        },
+        {
+          "name": "PUT /channels/:channel_id/me",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/channels/:channel_id/me",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "channels", ":channel_id", "me"],
+              "variable": [{ "key": "channel_id", "value": "{{channel_id}}" }]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notify_level\": \"mentions\",\n  \"muted\": false,\n  \"hidden\": false\n}"
+            }
+          }
+        },
+        {
+          "name": "GET /channels/:channel_id/members",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/channels/:channel_id/members?limit=50",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "channels", ":channel_id", "members"],
+              "query": [
+                { "key": "limit", "value": "50" },
+                { "key": "cursor", "value": "", "disabled": true }
+              ],
+              "variable": [{ "key": "channel_id", "value": "{{channel_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        },
+        {
+          "name": "POST /channels/:channel_id/members",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/channels/:channel_id/members",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "channels", ":channel_id", "members"],
+              "variable": [{ "key": "channel_id", "value": "{{channel_id}}" }]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_ids\": [\"{{user_id}}\"]\n}"
+            }
+          }
+        },
+        {
+          "name": "DELETE /channels/:channel_id/members/:user_id",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/channels/:channel_id/members/:user_id",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "channels", ":channel_id", "members", ":user_id"],
+              "variable": [
+                { "key": "channel_id", "value": "{{channel_id}}" },
+                { "key": "user_id", "value": "{{user_id}}" }
+              ]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "DMs",
+      "item": [
+        {
+          "name": "POST /teams/:team_id/dms",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var body = pm.response.json();",
+                  "if (body.id) pm.collectionVariables.set('dm_id', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/teams/:team_id/dms",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "teams", ":team_id", "dms"],
+              "variable": [{ "key": "team_id", "value": "{{team_id}}" }]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_ids\": [\"{{user_id}}\"]\n}"
+            }
+          }
+        },
+        {
+          "name": "PUT /channels/:dm_id/me (hide DM)",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/channels/:channel_id/me",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "channels", ":channel_id", "me"],
+              "variable": [{ "key": "channel_id", "value": "{{dm_id}}" }]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notify_level\": \"all\",\n  \"muted\": false,\n  \"hidden\": true\n}"
+            }
           }
         }
       ]
