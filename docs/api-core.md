@@ -804,7 +804,7 @@ The invite page: which team and whether the link still works. Shown before login
 | Status | code | When |
 |---|---|---|
 | 404 | `invite_not_found` | no invite with this code, or its team was deleted |
-| 429 | `rate_limited` | more than 30 lookups per minute from this IP |
+| 429 | `rate_limited` | more than 30 lookups or joins per minute from this IP |
 
 ---
 
@@ -835,6 +835,7 @@ Join the team with an invite. I become a `member` and join the default channels.
 |---|---|---|
 | 404 | `invite_not_found` | no invite with this code, or its team was deleted |
 | 410 | `invite_invalid` | the invite expired, was revoked or is used up; `message` says which |
+| 429 | `rate_limited` | more than 30 lookups or joins per minute from this IP |
 
 ---
 
