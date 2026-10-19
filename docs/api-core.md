@@ -961,7 +961,7 @@ Create a public or private channel. I become its owner and only member. Publishe
 
 <a id="post-teams-team_id-dms"></a>
 ## POST /teams/{team_id}/dms
-Open a DM with 1 to 7 other people (max 8 with me). If a DM with exactly these people exists in the team, it is returned. Publishes `membership.changed` (`added`) for each member when a DM is created.
+Open a DM with 1 to 7 other people (max 8 with me). If a DM with exactly these people exists in the team, it is returned; anyone in it who left the team and is back is added to it again. Publishes `membership.changed` (`added`) for each member when a DM is created.
 
 **Auth:** `Authorization: Bearer <JWT>`
 
@@ -992,6 +992,7 @@ Open a DM with 1 to 7 other people (max 8 with me). If a DM with exactly these p
 | 400 | `validation_error` | 0 or more than 7 other people, or only me |
 | 400 | `user_not_in_team` | someone in `user_ids` is not in the team |
 | 403 | `not_a_team_member` | I am not in the team |
+| 404 | `team_not_found` | the team doesn't exist or was deleted |
 
 ---
 
