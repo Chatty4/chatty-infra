@@ -60,6 +60,7 @@ Source: the chatty-chat Confluence page (sections 5 and 8) and `docs/decisions.m
 
 - chatty-chat does not issue tokens. The web app gets them from chatty-core ([POST /auth/login](api-core.md#post-auth-login)) and sends the same access token here.
 - Every REST endpoint needs `Authorization: Bearer <access_token>`. chatty-chat checks the RS256 signature with chatty-core's public key and reads the user id from `sub`.
+- A token without `exp` or `sub` is rejected with `401 unauthorized`.
 - The WebSocket gets the token in the URL ([GET /ws](#get-ws)) and is closed with code `4001` when the token expires.
 - No token, a bad signature or an expired token returns `401 unauthorized`. The web app then refreshes the token through chatty-core and repeats the request once.
 - The token has no teams or roles. They come from chatty-core's memberships response, cached in Redis for 5 minutes and cleared by chatty-core's events. A deactivated user (`is_active: false`) gets `403 user_inactive`.
