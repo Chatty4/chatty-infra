@@ -124,6 +124,7 @@ Every error has the same body:
 | 500 | `internal_error` | a bug; `error.request_id` finds it in the logs |
 
 - Every `429` (`rate_limited` and `too_many_attempts`) has a `Retry-After` header with the seconds to wait.
+- If Redis is unavailable, rate limits are skipped and the request proceeds.
 - A `500` hides the details. The body only has `code`, `message` and `request_id`.
 
 <a id="field-reasons"></a>
