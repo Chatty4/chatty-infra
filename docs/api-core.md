@@ -93,6 +93,7 @@ Source: the chatty-core Confluence page (section 4) and `docs/decisions.md`. If 
 - The **Who** line of each endpoint says who may call it. It is checked after the token, with the user's role in the team (`owner`, `admin`, `member`) and in the channel (`owner`, `member`).
 - A valid token for a user who is not allowed returns `403` with a specific `code` (for example `not_a_team_member` or `forbidden`).
 - A deactivated user gets `403 user_inactive`, even with a token that has not expired yet.
+- A deactivated user keeps their team memberships and roles. In a team where they were the only active owner, the active admin who joined first becomes owner, or else the active member who joined first. Publishes `team.member.changed` (`role_changed`).
 
 ---
 
