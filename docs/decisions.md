@@ -106,3 +106,10 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
 - **Why:** Short-lived JWTs are the usual trade-off: no lookup per request in chatty-core or chatty-chat. Key changes are rare, and logging everyone out once is acceptable.
 - **Rejected:** a token denylist in Redis (a check on every request in both services); `kid` with several active keys (changes in chatty-core and chatty-chat, only useful once keys are rotated).
 - **Plan impact:** none (CHAT-256).
+
+## D-11: Any member can create invites that never expire
+- **Status:** proposed
+- **Decision:** Keep it as it is. Any team member can create an invite with `max_age: 0` (never expires) and `max_uses: 0` (unlimited).
+- **Why:** Owners and admins can see and revoke every invite, and a member's invites are revoked when they leave or are removed. Blocking `max_age: 0` for members would not stop a leaked 7-day link either.
+- **Rejected:** only owners and admins can create invites that never expire (a new 403 case and a role check, for little gain).
+- **Plan impact:** none (CHAT-256).
