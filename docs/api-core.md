@@ -94,6 +94,7 @@ Source: the chatty-core Confluence page (section 4) and `docs/decisions.md`. If 
 - A valid token for a user who is not allowed returns `403` with a specific `code` (for example `not_a_team_member` or `forbidden`).
 - A deactivated user gets `403 user_inactive`, even with a token that has not expired yet.
 - A deactivated user keeps their team memberships and roles. In a team where they were the only active owner, the active admin who joined first becomes owner, or else the active member who joined first. Publishes `team.member.changed` (`role_changed`).
+- Deactivating a user revokes every invite they created that is still open, in every team. Invites created by others keep working.
 
 ---
 
@@ -575,7 +576,7 @@ Leave the team. I am also removed from all its channels, and the invites I creat
 | Status | code | When |
 |---|---|---|
 | 403 | `not_a_team_member` | I am not in the team |
-| 409 | `last_owner` | I am the only owner; make someone else owner first, or delete the team |
+| 409 | `last_owner` | I am the only active owner (deactivated owners don't count); make someone else owner first, or delete the team |
 
 ---
 
@@ -655,7 +656,7 @@ Change a member's role. Publishes `team.member.changed` (`role_changed`).
 | 403 | `not_a_team_member` | I am not in the team |
 | 404 | `member_not_found` | the user is not in the team |
 | 404 | `team_not_found` | the team doesn't exist or was deleted |
-| 409 | `last_owner` | the change would leave the team without an owner |
+| 409 | `last_owner` | the change would leave the team without an active owner (deactivated owners don't count) |
 
 ---
 
