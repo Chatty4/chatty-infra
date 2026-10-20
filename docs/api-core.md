@@ -95,6 +95,7 @@ Source: the chatty-core Confluence page (section 4) and `docs/decisions.md`. If 
 - A deactivated user gets `403 user_inactive`, even with a token that has not expired yet.
 - A deactivated user keeps their team memberships and roles. In a team where they were the only active owner, the active admin who joined first becomes owner, or else the active member who joined first. Publishes `team.member.changed` (`role_changed`).
 - Deactivating a user revokes every invite they created that is still open, in every team. Invites created by others keep working.
+- Deactivated users don't count as channel owners. When a private channel has no active owner left after someone leaves or is removed, the active member who joined first becomes its owner.
 
 ---
 
