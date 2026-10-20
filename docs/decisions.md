@@ -108,7 +108,7 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
 - **Plan impact:** none (CHAT-256).
 
 ## D-11: Any member can create invites that never expire
-- **Status:** proposed
+- **Status:** accepted
 - **Decision:** Keep it as it is. Any team member can create an invite with `max_age: 0` (never expires) and `max_uses: 0` (unlimited).
 - **Why:** Owners and admins can see and revoke every invite, and a member's invites are revoked when they leave or are removed. Blocking `max_age: 0` for members would not stop a leaked 7-day link either.
 - **Rejected:** only owners and admins can create invites that never expire (a new 403 case and a role check, for little gain).
