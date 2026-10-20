@@ -94,8 +94,15 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
 - **Plan impact:** none (CHAT-138 "Write docs/core-events.md", CHAT-172 publish, CHAT-187 consume).
 
 ## D-09: Client IP for rate limits
-- **Status:** proposed
+- **Status:** accepted
 - **Decision:** In production, chatty-core and chatty-chat are reachable only through chatty-web's Nginx. Nginx sets `X-Real-IP` to the client's address, overwriting any value the client sent. The services read `X-Real-IP` only when `BEHIND_PROXY=True`; otherwise they use the socket address (`REMOTE_ADDR`). Local development keeps `BEHIND_PROXY=False`.
 - **Why:** Behind a proxy every request has the proxy's IP, so all users would share one rate limit (`register:{ip}`, `login_fail:{ip}`). A client can fake any header, so only a value the proxy overwrites is trusted.
 - **Rejected:** counting hops in `X-Forwarded-For` (more code, and wrong as soon as a proxy is added or removed, or when a client reaches the backend directly).
 - **Plan impact:** none in days (CHAT-240).
+
+## D-10: Access tokens can't be revoked
+- **Status:** accepted
+- **Decision:** Access tokens stay valid until they expire (15 minutes), even after logout or a password change. Only refresh tokens are revoked. (chatty-core already rejects deactivated users on every request.) Tokens have no `kid` header, so changing the signing key logs everyone out.
+- **Why:** Short-lived JWTs are the usual trade-off: no lookup per request in chatty-core or chatty-chat. Key changes are rare, and logging everyone out once is acceptable.
+- **Rejected:** a token denylist in Redis (a check on every request in both services); `kid` with several active keys (changes in chatty-core and chatty-chat, only useful once keys are rotated).
+- **Plan impact:** none (CHAT-256).
