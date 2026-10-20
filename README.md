@@ -12,7 +12,8 @@ You need Git, Docker Desktop and, for local virtualenvs, Python 3.14.
    ```
 
 2. Run `setup.bat`. It clones the other repos next to this one on `dev`, creates every `.env` from its
-   `.env.example` with matching secrets, creates `chatty.code-workspace`, and can set up the virtualenvs
+   `.env.example` with matching secrets, creates the JWT key pair in `chatty-core/keys` once (new keys
+   would log everyone out), creates `chatty.code-workspace`, and can set up the virtualenvs
    and start the stack. It is safe to run again: it never overwrites a value you set and never touches a
    repo with uncommitted changes.
 
@@ -68,3 +69,9 @@ Without the scripts, the same with plain compose: `docker compose up -d --wait`,
 
 The API contracts, events and decisions shared by chatty-core and chatty-chat live in `docs/`. Change
 them here first, in their own PR, before changing a service.
+
+## Postman
+
+`postman/chatty.postman_collection.json` has a request for every chatty-core endpoint, and
+`postman/chatty-local.postman_environment.json` points it at the local stack. Import both into Postman, or
+run the collection with the Postman CLI.
