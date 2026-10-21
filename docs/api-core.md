@@ -967,7 +967,7 @@ Create a public or private channel. I become its owner and only member. Publishe
 
 <a id="post-teams-team_id-dms"></a>
 ## POST /teams/{team_id}/dms
-Open a DM with 1 to 7 other people (max 8 with me). If a DM with exactly these people exists in the team, it is returned; anyone in it who left the team and is back is added to it again. Publishes `membership.changed` (`added`) for each member when a DM is created.
+Open a DM with 1 to 7 other people (max 8 with me). If a DM with exactly these people exists in the team, it is returned; anyone in it who left the team and is back is added to it again. Publishes `membership.changed` (`added`) for each member when a DM is created, and for each member added back to an existing DM.
 
 **Auth:** `Authorization: Bearer <JWT>`
 
