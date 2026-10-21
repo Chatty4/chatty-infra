@@ -24,7 +24,7 @@ The 5 events that chatty-core publishes on Redis, with their exact JSON and what
 |---|---|
 | Transport | Redis pub/sub |
 | Channel | `core.events`, one channel for all 5 events. chatty-chat tells them apart by `type` |
-| Publisher | chatty-core, after its database transaction commits (`transaction.on_commit`), so a call made after the event always returns the new data |
+| Publisher | chatty-core, after its database transaction commits, so a call made after the event always returns the new data |
 | Subscribers | the chatty-chat `api` and every `gateway`, all of them to all 5 events |
 | Stored | no. Pub/sub keeps nothing: a subscriber that is not connected misses the event |
 | Delivery | at most once. See [missed events](#missed-events) |
@@ -60,7 +60,7 @@ The 5 events that chatty-core publishes on Redis, with their exact JSON and what
 
 <a id="event-membership-changed"></a>
 ## membership.changed
-A user was added to a channel, removed from it, or changed their settings for it.
+A user was added to a channel, removed from it, changed their settings for it, or became its owner because the last owner left.
 ```json
 {
   "type": "membership.changed",
@@ -81,12 +81,12 @@ A user was added to a channel, removed from it, or changed their settings for it
 | `team_id` | uuid | the team of the channel |
 | `action` | string | `added`, `removed` or `settings` |
 
-**Published by:** create a channel, join, leave, add or remove members, open a DM (one event for each member), join a team (one for each default channel), [PUT /channels/{channel_id}/me](api-core.md#put-channels-channel_id-me)
+**Published by:** create a channel, join, leave, add or remove members, open a DM (one event for each member when it is created, or for each member added back to an existing one), join a team (one for each default channel), [PUT /channels/{channel_id}/me](api-core.md#put-channels-channel_id-me), the owner hand-off when a private channel's last owner leaves the channel or the team, or is removed from either (one for the member who becomes owner)
 
 **`action`**
 - `added`: the user joined the channel, was added, or created it.
 - `removed`: the user left, or was removed.
-- `settings`: the user's `notify_level`, `muted` or `hidden` for this channel changed. The event has no values: chatty-chat gets them from [GET /internal/users/{user_id}/memberships](api-internal.md#get-internal-users-user_id-memberships).
+- `settings`: the user's `notify_level`, `muted` or `hidden` for this channel changed, or the user became the channel's owner in an owner hand-off. The event has no values: chatty-chat gets them from [GET /internal/users/{user_id}/memberships](api-internal.md#get-internal-users-user_id-memberships).
 
 **chatty-chat**
 - Deletes `members:{user_id}` and `channel:{channel_id}`.
