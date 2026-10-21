@@ -119,7 +119,7 @@ A user joined a team, left it, was removed from it, or got a new role in it.
 | `action` | string | `joined`, `left`, `removed` or `role_changed` |
 | `role` | string or `null` | the user's role in the team after the change: `owner`, `admin` or `member`. `null` when `action` is `left` or `removed`. Always present |
 
-**Published by:** [join with an invite](api-core.md#post-invites-invite_code-join), [leave a team](api-core.md#post-teams-team_id-leave), [remove a member](api-core.md#delete-teams-team_id-members-user_id), [change a role](api-core.md#put-teams-team_id-members-user_id)
+**Published by:** [join with an invite](api-core.md#post-invites-invite_code-join), [leave a team](api-core.md#post-teams-team_id-leave), [remove a member](api-core.md#delete-teams-team_id-members-user_id), [change a role](api-core.md#put-teams-team_id-members-user_id), the owner hand-off when a team's only active owner is deactivated (`role_changed` for the member who becomes owner)
 
 **chatty-chat**
 - Deletes `members:{user_id}`.
