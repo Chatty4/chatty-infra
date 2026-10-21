@@ -157,6 +157,7 @@ services:
       # Service names and ports inside the network; these win over chatty-chat/.env.
       DATABASE_URL: postgresql+asyncpg://${CHAT_DB_USER:-chat_user}:${CHAT_DB_PASSWORD:-chat_pass}@chat-db:5432/${CHAT_DB_NAME:-chat_db}
       REDIS_URL: redis://redis:6379/0
+      CORE_INTERNAL_URL: http://chatty-core:8000
       CORE_SERVICE_TOKEN: ${CORE_SERVICE_TOKEN:-change-me}
       JWT_PUBLIC_KEY_PATH: /keys/jwt_public.pem
       # File change events don't reach Linux containers from Windows mounts; poll instead.
