@@ -95,7 +95,7 @@ Source: the chatty-core Confluence page (section 4) and `docs/decisions.md`. If 
 - A deactivated user gets `403 user_inactive`, even with a token that has not expired yet.
 - A deactivated user keeps their team memberships and roles. In a team where they were the only active owner, the active admin who joined first becomes owner, or else the active member who joined first. Publishes `team.member.changed` (`role_changed`).
 - Deactivating a user revokes every invite they created that is still open, in every team. Invites created by others keep working.
-- Deactivated users don't count as channel owners. When a private channel has no active owner left after someone leaves or is removed, the active member who joined first becomes its owner.
+- Deactivated users don't count as channel owners. When a private channel has no active owner left after someone leaves or is removed, the active member who joined first becomes its owner. Publishes `membership.changed` (`settings`) for them.
 
 ---
 
@@ -565,7 +565,7 @@ Delete the team. It is a soft delete: the team disappears for everyone, and a cl
 
 <a id="post-teams-team_id-leave"></a>
 ## POST /teams/{team_id}/leave
-Leave the team. I am also removed from all its channels, and the invites I created for it are revoked. If I was the last owner of a private channel, the member who joined first becomes its owner. Publishes `team.member.changed` (`left`).
+Leave the team. I am also removed from all its channels, and the invites I created for it are revoked. If I was the last owner of a private channel, the member who joined first becomes its owner (`membership.changed` `settings` for them). Publishes `team.member.changed` (`left`).
 
 **Auth:** `Authorization: Bearer <JWT>`
 
@@ -663,7 +663,7 @@ Change a member's role. Publishes `team.member.changed` (`role_changed`).
 
 <a id="delete-teams-team_id-members-user_id"></a>
 ## DELETE /teams/{team_id}/members/{user_id}
-Remove someone from the team. They are also removed from all the team's channels, and the invites they created for it are revoked. They can still rejoin with someone else's invite (removal is not a ban). If they were the last owner of a private channel, the member who joined first becomes its owner. Publishes `team.member.changed` (`removed`).
+Remove someone from the team. They are also removed from all the team's channels, and the invites they created for it are revoked. They can still rejoin with someone else's invite (removal is not a ban). If they were the last owner of a private channel, the member who joined first becomes its owner (`membership.changed` `settings` for them). Publishes `team.member.changed` (`removed`).
 
 **Auth:** `Authorization: Bearer <JWT>`
 
@@ -1122,7 +1122,7 @@ Join a public channel. Publishes `membership.changed` (`added`).
 
 <a id="post-channels-channel_id-leave"></a>
 ## POST /channels/{channel_id}/leave
-Leave a channel. Publishes `membership.changed` (`removed`). If I was the last owner of a private channel, the member who joined first becomes the owner.
+Leave a channel. Publishes `membership.changed` (`removed`). If I was the last owner of a private channel, the member who joined first becomes the owner (`membership.changed` `settings` for them).
 
 **Auth:** `Authorization: Bearer <JWT>`
 
@@ -1212,7 +1212,7 @@ Add people to a channel. People who are already members are skipped. Publishes `
 
 <a id="delete-channels-channel_id-members-user_id"></a>
 ## DELETE /channels/{channel_id}/members/{user_id}
-Remove someone from a channel. Publishes `membership.changed` (`removed`); chatty-chat stops sending them the channel's events right away. If they were the last owner of a private channel, the member who joined first becomes the owner, as with [leave](#post-channels-channel_id-leave).
+Remove someone from a channel. Publishes `membership.changed` (`removed`); chatty-chat stops sending them the channel's events right away. If they were the last owner of a private channel, the member who joined first becomes the owner (`membership.changed` `settings` for them), as with [leave](#post-channels-channel_id-leave).
 
 **Auth:** `Authorization: Bearer <JWT>`
 
@@ -1475,7 +1475,7 @@ chatty-core publishes 5 events on Redis pub/sub, only after its transaction comm
 
 | Event | Published by |
 |---|---|
-| `membership.changed` | create channel, join, leave, add or remove members, open a DM, join a team, `PUT /channels/{channel_id}/me` |
+| `membership.changed` | create channel, join, leave, add or remove members, open a DM, join a team, `PUT /channels/{channel_id}/me`, owner hand-off in a private channel |
 | `team.member.changed` | join with an invite, leave a team, remove a member, change a role |
 | `channel.updated` | rename, change topic, archive |
 | `team.deleted` | delete a team |
