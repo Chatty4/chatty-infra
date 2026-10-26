@@ -1117,7 +1117,7 @@ Join a public channel. Publishes `membership.changed` (`added`).
 | 403 | `not_a_team_member` | I am not in the team |
 | 403 | `cannot_join_private` | the channel is private or a DM |
 | 404 | `channel_not_found` | the channel doesn't exist |
-| 409 | `channel_archived` | the channel is archived |
+| 409 | `channel_archived` | the channel is archived and I am not a member |
 
 ---
 
