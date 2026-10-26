@@ -365,6 +365,7 @@ Change the password. All other devices are logged out (their refresh tokens are 
 | 400 | `wrong_password` | `old_password` is wrong |
 | 401 | `invalid_refresh_token` | `refresh_token` is unknown, expired, deleted or already rotated |
 | 403 | `forbidden` | `refresh_token` belongs to another user |
+| 429 | `rate_limited` | 5 tries in 15 minutes without the right `old_password` (a successful change resets the count). `Retry-After` says when to try again |
 
 ---
 
@@ -1027,6 +1028,7 @@ One channel.
 }
 ```
 - `my` is `null` when I can read the channel but haven't joined it
+- `name` and `topic` are `null` for a DM, the same as in [GET /teams/{team_id}/channels](#get-teams-team_id-channels)
 
 **Errors**
 | Status | code | When |
@@ -1116,7 +1118,7 @@ Join a public channel. Publishes `membership.changed` (`added`).
 | 403 | `not_a_team_member` | I am not in the team |
 | 403 | `cannot_join_private` | the channel is private or a DM |
 | 404 | `channel_not_found` | the channel doesn't exist |
-| 409 | `channel_archived` | the channel is archived |
+| 409 | `channel_archived` | the channel is archived and I am not a member |
 
 ---
 
