@@ -1027,6 +1027,7 @@ One channel.
 }
 ```
 - `my` is `null` when I can read the channel but haven't joined it
+- `name` and `topic` are `null` for a DM, the same as in [GET /teams/{team_id}/channels](#get-teams-team_id-channels)
 
 **Errors**
 | Status | code | When |
