@@ -365,6 +365,7 @@ Change the password. All other devices are logged out (their refresh tokens are 
 | 400 | `wrong_password` | `old_password` is wrong |
 | 401 | `invalid_refresh_token` | `refresh_token` is unknown, expired, deleted or already rotated |
 | 403 | `forbidden` | `refresh_token` belongs to another user |
+| 429 | `rate_limited` | 5 tries in 15 minutes without the right `old_password` (a successful change resets the count). `Retry-After` says when to try again |
 
 ---
 
