@@ -81,7 +81,7 @@ A user was added to a channel, removed from it, changed their settings for it, o
 | `team_id` | uuid | the team of the channel |
 | `action` | string | `added`, `removed` or `settings` |
 
-**Published by:** create a channel, join, leave, add or remove members, open a DM (one event for each member when it is created, or for each member added back to an existing one), [create a team](api-core.md#post-teams) (one for the creator in `#general`), join a team (one for each default channel), [PUT /channels/{channel_id}/me](api-core.md#put-channels-channel_id-me), the owner hand-off when a private channel's last owner leaves the channel or the team, or is removed from either (one for the member who becomes owner)
+**Published by:** create a channel, join, leave, add or remove members, open a DM (one event for each member when it is created, or for each member added back to an existing one), [create a team](api-core.md#post-teams) (one for the creator in `#general`), join a team (one for each default channel), [leave a team](api-core.md#post-teams-team_id-leave) or [be removed from it](api-core.md#delete-teams-team_id-members-user_id) (one `removed` for each channel of the team the user was in, DMs included), [PUT /channels/{channel_id}/me](api-core.md#put-channels-channel_id-me), the owner hand-off when a private channel's last owner leaves the channel or the team, or is removed from either (one for the member who becomes owner)
 
 **`action`**
 - `added`: the user joined the channel, was added, or created it.
