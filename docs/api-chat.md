@@ -186,8 +186,8 @@ Send a message. A retry with the same `client_msg_id` returns the original messa
   "file_ids": ["f6…"]
 }
 ```
-- `client_msg_id`: a UUID made by the web app for this message. The same value on a retry returns the original
-- `body`: 1–4000 chars, required unless `file_ids` is not empty
+- `client_msg_id`: a UUID made by the web app for this message. The same value on a retry returns the original, even if the channel was archived or its team deleted since. The same value already used for a message in another channel returns `400 validation_error` with `fields.client_msg_id: "already_used"`
+- `body`: 1–4000 chars, required unless `file_ids` is not empty. The body isn't trimmed, so a body of only spaces counts as text
 - `file_ids`: max 10, each must be a `ready` attachment uploaded by the sender in the channel's team ([upload in chatty-core](api-core.md#post-files))
 - Before saving, chatty-chat calls chatty-core's `attach` for each file (D-03). If one fails, the files already attached in this request are detached and nothing is saved
 
@@ -216,7 +216,7 @@ Send a message. A retry with the same `client_msg_id` returns the original messa
 **Errors**
 | Status | code | When |
 |---|---|---|
-| 400 | `validation_error` | body empty without files, body too long, more than 10 files |
+| 400 | `validation_error` | body empty without files, body too long, more than 10 files, `client_msg_id` already used in another channel |
 | 400 | `invalid_file` | a file is not `ready`, not the sender's, of another team or already in a message; `message` names the file |
 | 403 | `not_a_member` | user is not in the channel |
 | 404 | `channel_not_found` | channel does not exist |
@@ -238,7 +238,7 @@ Edit the text of my message. `body` is the only editable field, so the request a
   "body": "deploy at 6? <@u3…>"
 }
 ```
-- `body`: 1–4000 chars. Empty only if the message has files
+- `body`: 1–4000 chars. Empty only if the message has files. Not trimmed: a body of only spaces counts as text
 
 **Response 200**: the [message object](#message-object) with the new `body`, `mentions` and `edited_at`
 - Also sends a [message.edited](#event-message-edited) event
@@ -262,6 +262,7 @@ Delete a message. It is a soft delete: the message stays in its place as "delete
 **Auth:** `Authorization: Bearer <JWT>`
 
 **Who:** the author. In public and private channels also the channel owner and team owner or admin. In DMs only the author (D-05).
+- The user must also [be able to read](#access) the channel. A team owner or admin who is not in a private channel can't read it, so they get `404 message_not_found` there (to confirm with the PO: D-05 says they can delete any message in the channel)
 
 **Response 204** (no body). Also 204 if it was already deleted.
 - Also sends a [message.deleted](#event-message-deleted) event
@@ -794,10 +795,12 @@ GET /api/chat/v1/ws?token=eyJhbGciOiJSUzI1NiIs…
 | `4002` | `heartbeat_timeout` | reconnect, call [POST /sync](#post-sync) (no token refresh) |
 | `4003` | `user_inactive` | log out |
 | `4008` | `too_many_messages` | wait, reconnect, call [POST /sync](#post-sync) |
-| `1001` | gateway restart | reconnect with backoff, call [POST /sync](#post-sync) |
+| `1011` | chatty-core could not be reached while connecting | reconnect with backoff, call [POST /sync](#post-sync) |
+| `1012` | gateway restart (sent by uvicorn on shutdown) | reconnect with backoff, call [POST /sync](#post-sync) |
 
 - The web app may refresh the token about 1 minute before `exp` and reconnect early, so the socket is not closed with `4001`.
 - When the user is removed from a channel (`membership.changed` from chatty-core), the gateway stops sending that channel's events right away. No message is sent; the sidebar updates from chatty-core.
+- On `team.deleted` the gateway changes nothing: open sockets stay subscribed to the team's channels. Those channels are read-only (writes return `409 channel_archived`), so no new events arrive.
 
 ---
 
