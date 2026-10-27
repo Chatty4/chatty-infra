@@ -248,6 +248,7 @@ Edit the text of my message. `body` is the only editable field, so the request a
 |---|---|---|
 | 400 | `validation_error` | body empty without files, or too long |
 | 403 | `not_author` | the message is someone else's |
+| 403 | `not_a_member` | I wrote the message but am no longer in the channel (I can still read a public channel) |
 | 404 | `message_not_found` | the message doesn't exist, or the user can't read its channel |
 | 409 | `message_deleted` | the message was deleted |
 | 409 | `channel_archived` | the channel is archived or its team was deleted |
