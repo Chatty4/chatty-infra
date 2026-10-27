@@ -185,9 +185,9 @@ A team was deleted (soft delete).
 **Published by:** [DELETE /teams/{team_id}](api-core.md#delete-teams-team_id)
 
 **chatty-chat**
-- Deletes the cache of the team's channels.
+- Deletes every cached channel (`channel:*`): the event only has `team_id`, so it can't tell which cached channels belong to the team.
 - Rejects writes to those channels with `409 channel_archived`.
-- The gateways unsubscribe all sockets from the team's channels.
+- The gateways don't change open sockets: they stay subscribed to the team's channels, which get no new events because writes are rejected.
 
 ---
 

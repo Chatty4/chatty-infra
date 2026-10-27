@@ -90,7 +90,7 @@ The web app keeps one number per channel: the last `seq` it has applied (`last_s
 | `seq` = `last_seen` + 1 | Apply it and set `last_seen = seq` |
 | `seq` > `last_seen` + 1 | There is a gap. Do **not** apply it. Call [GET /channels/{channel_id}/events](api-chat.md#get-channels-channel_id-events) with `after_seq=last_seen`, apply the returned events in order, then apply this one |
 
-**After a reconnect** (close codes `4001`, `4002`, `4008`, `1001`, or a dropped network)
+**After a reconnect** (close codes `4001`, `4002`, `4008`, `1011`, `1012`, or a dropped network)
 1. Reconnect the WebSocket. Events that arrive meanwhile are held back until step 2 is done.
 2. Call [POST /sync](api-chat.md#post-sync) with `last_seen` of every channel the web app has open.
 3. Apply the returned events of each channel in order, then release the held-back ones (the duplicate rule drops the ones already applied).
@@ -213,7 +213,8 @@ A channel event inside a wrapper.
 | `4002` | `heartbeat_timeout` | reconnect, then `POST /sync` (no token refresh) |
 | `4003` | `user_inactive` | log out |
 | `4008` | `too_many_messages` | wait, reconnect, then `POST /sync` |
-| `1001` | gateway restart | reconnect with backoff, then `POST /sync` |
+| `1011` | chatty-core could not be reached while connecting | reconnect with backoff, then `POST /sync` |
+| `1012` | gateway restart (sent by uvicorn on shutdown) | reconnect with backoff, then `POST /sync` |
 
 - The web app can refresh the token about 1 minute before `exp` and reconnect early, so the socket is never closed with `4001`.
 - When the user is removed from a channel, the gateway stops sending that channel's events. It sends no message about it: the sidebar updates from chatty-core.
@@ -393,7 +394,7 @@ Every channel event is also written to Kafka, for the services that are not the 
 
 **Delivery:** at least once. A duplicate is harmless: the web app ignores a `seq` it already has, and the push worker skips events it already sent.
 
-**Until the Kafka epic lands** (sprints 5 to 6), the gateways read events from Redis pub/sub behind the same `EventBus` interface. The JSON is the same, so the web app does not change.
+**Until the Kafka epic lands** (sprints 5 to 6), chatty-chat publishes each event on Redis pub/sub (`chat.events:{channel_id}`) after the commit, and each gateway subscribes to the channels of its open sockets. The JSON is the same, so the web app does not change.
 
 <a id="kafka-consumers"></a>
 ## Consumers
