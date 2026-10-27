@@ -149,7 +149,7 @@ services:
     build: ../chatty-chat
     image: chatty-chat:dev
     container_name: chatty-chat
-    command: sh -c "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload"
+    command: sh -c "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8001 --ws-max-size 4096 --reload"
     env_file:
       - path: ../chatty-chat/.env
         required: false
