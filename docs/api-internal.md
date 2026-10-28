@@ -81,6 +81,7 @@ The errors below each endpoint are only the ones specific to it.
 | [GET /internal/channels/{channel_id}](#get-internal-channels-channel_id) | `channel:{channel_id}` | 5 minutes | `membership.changed`, `channel.updated`, `team.deleted` |
 
 - chatty-core publishes the events only after its transaction commits, so a call made after the event always returns the new data.
+- A call made just before the event can still return the old data after chatty-chat deleted the key. So that it isn't cached again, every key has a version counter (`version:members:{user_id}`, `version:channel:{channel_id}`), plus one for all keys (`version:all`). An event increments the key's version, then deletes the key, in one transaction. `team.deleted` and the cache clear after a reconnect increment `version:all`. A cache miss reads both versions before calling chatty-core and stores the answer only if neither changed meanwhile (a Lua script, so nothing can come in between).
 - The TTL is a backstop if an event is lost. The other endpoints are never cached.
 
 ---
