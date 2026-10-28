@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "chatty",
-    "description": "All routes in chatty-core and chatty-chat.\n\n1. Select the \"Chatty local\" environment (chatty-local.postman_environment.json).\n2. Run Auth > register once, then login. Login saves access_token and refresh_token.",
+    "description": "All routes in chatty-core and chatty-chat.\n\n1. Select the \"Chatty local\" environment (chatty-local.postman_environment.json).\n2. Run Auth > register once, then login. Login saves access_token and refresh_token.\n3. Internal uses service_token from the environment: the dev default change-me. If chatty-infra/.env sets another CORE_SERVICE_TOKEN, use that.\n\nThe WebSocket (GET {{chat_url}}/api/chat/v1/ws?token={{access_token}}) can't be stored in a collection file: open it in Postman with New > WebSocket.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -12,7 +12,10 @@
     { "key": "user_id", "value": "" },
     { "key": "invite_id", "value": "" },
     { "key": "invite_code", "value": "" },
-    { "key": "dm_id", "value": "" }
+    { "key": "dm_id", "value": "" },
+    { "key": "me_id", "value": "" },
+    { "key": "client_msg_id", "value": "" },
+    { "key": "message_id", "value": "" }
   ],
   "item": [
     {
@@ -154,6 +157,17 @@
       "item": [
         {
           "name": "GET /me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var body = pm.response.json();",
+                  "if (body.id) pm.collectionVariables.set('me_id', body.id);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{core_url}}/api/core/v1/me",
@@ -743,6 +757,179 @@
               "mode": "raw",
               "raw": "{\n  \"notify_level\": \"all\",\n  \"muted\": false,\n  \"hidden\": true\n}"
             }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Messages (chatty-chat)",
+      "item": [
+        {
+          "name": "POST /channels/:channel_id/messages",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// a new message each run; send it twice without this to see the retry (200)",
+                  "pm.collectionVariables.set('client_msg_id', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var body = pm.response.json();",
+                  "if (body.id) pm.collectionVariables.set('message_id', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{chat_url}}/api/chat/v1/channels/:channel_id/messages",
+              "host": ["{{chat_url}}"],
+              "path": ["api", "chat", "v1", "channels", ":channel_id", "messages"],
+              "variable": [{ "key": "channel_id", "value": "{{channel_id}}" }]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_msg_id\": \"{{client_msg_id}}\",\n  \"body\": \"deploy at 5? <@{{me_id}}>\"\n}"
+            }
+          }
+        },
+        {
+          "name": "GET /channels/:channel_id/messages",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{chat_url}}/api/chat/v1/channels/:channel_id/messages?limit=50",
+              "host": ["{{chat_url}}"],
+              "path": ["api", "chat", "v1", "channels", ":channel_id", "messages"],
+              "query": [
+                { "key": "limit", "value": "50", "description": "1-100" },
+                { "key": "before_seq", "value": "", "disabled": true, "description": "older than this seq; for scrolling up" }
+              ],
+              "variable": [{ "key": "channel_id", "value": "{{channel_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        },
+        {
+          "name": "PUT /messages/:message_id",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{chat_url}}/api/chat/v1/messages/:message_id",
+              "host": ["{{chat_url}}"],
+              "path": ["api", "chat", "v1", "messages", ":message_id"],
+              "variable": [{ "key": "message_id", "value": "{{message_id}}" }]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"deploy at 6? <@{{me_id}}>\"\n}"
+            }
+          }
+        },
+        {
+          "name": "DELETE /messages/:message_id",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{chat_url}}/api/chat/v1/messages/:message_id",
+              "host": ["{{chat_url}}"],
+              "path": ["api", "chat", "v1", "messages", ":message_id"],
+              "variable": [{ "key": "message_id", "value": "{{message_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sync (chatty-chat)",
+      "item": [
+        {
+          "name": "POST /sync",
+          "request": {
+            "method": "POST",
+            "url": "{{chat_url}}/api/chat/v1/sync",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cursors\": {\n    \"{{channel_id}}\": 0\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "GET /channels/:channel_id/events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{chat_url}}/api/chat/v1/channels/:channel_id/events?after_seq=0&limit=500",
+              "host": ["{{chat_url}}"],
+              "path": ["api", "chat", "v1", "channels", ":channel_id", "events"],
+              "query": [
+                { "key": "after_seq", "value": "0", "description": "required: the last seq the web app has" },
+                { "key": "limit", "value": "500", "description": "1-500" }
+              ],
+              "variable": [{ "key": "channel_id", "value": "{{channel_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Internal (chatty-core, for chatty-chat)",
+      "item": [
+        {
+          "name": "GET /internal/users/:user_id/memberships",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{core_url}}/internal/users/:user_id/memberships",
+              "host": ["{{core_url}}"],
+              "path": ["internal", "users", ":user_id", "memberships"],
+              "variable": [{ "key": "user_id", "value": "{{me_id}}" }]
+            },
+            "header": [
+              { "key": "X-Service-Token", "value": "{{service_token}}" }
+            ]
+          }
+        },
+        {
+          "name": "GET /internal/channels/:channel_id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{core_url}}/internal/channels/:channel_id",
+              "host": ["{{core_url}}"],
+              "path": ["internal", "channels", ":channel_id"],
+              "variable": [{ "key": "channel_id", "value": "{{channel_id}}" }]
+            },
+            "header": [
+              { "key": "X-Service-Token", "value": "{{service_token}}" }
+            ]
           }
         }
       ]
