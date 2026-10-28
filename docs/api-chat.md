@@ -750,7 +750,8 @@ GET /api/chat/v1/ws?token=eyJhbGciOiJSUzI1NiIs…
 { "type": "unwatch", "channel_id": "c8…" }
 ```
 - `heartbeat`: every 20 s. `visible` says if the tab is on screen (used to skip push notifications). No heartbeat for 60 s means offline, and the socket is closed with `4002`. Only `heartbeat` resets the 60 s timer
-- Invalid JSON and unknown message types are ignored without an `error`; the socket stays open
+- Invalid JSON, unknown message types and binary frames are ignored without an `error`; the socket stays open
+- A message is at most 4 KB. A bigger one closes the socket with `1009`
 - `typing`: at most once every 3 s per channel, only in channels the user can write in
 - `watch`: live updates for one public channel the user has not joined but is looking at. Only for channels in the user's `public_channel_ids`. Max 1 per socket; a new `watch` replaces the old one. No read state or unread counts
 
@@ -794,8 +795,11 @@ GET /api/chat/v1/ws?token=eyJhbGciOiJSUzI1NiIs…
 | `4001` | `token_expired` | refresh the token through chatty-core, reconnect, call [POST /sync](#post-sync) |
 | `4002` | `heartbeat_timeout` | reconnect, call [POST /sync](#post-sync) (no token refresh) |
 | `4003` | `user_inactive` | log out |
-| `4008` | `too_many_messages` | wait, reconnect, call [POST /sync](#post-sync) |
-| `1011` | chatty-core could not be reached while connecting | reconnect with backoff, call [POST /sync](#post-sync) |
+| `4008` | `too_many_messages` (planned, not sent yet) | wait, reconnect, call [POST /sync](#post-sync) |
+| `1001` | `gateway_restart`: the gateway lost Redis and reconnected, so it may have missed events | reconnect with backoff, call [POST /sync](#post-sync) |
+| `1001` | `too_slow`: the socket didn't take an event within 5 s | reconnect, call [POST /sync](#post-sync) |
+| `1009` | a client message over 4 KB (sent by uvicorn) | a bug in the web app; reconnect, call [POST /sync](#post-sync) |
+| `1011` | `core_unavailable`: chatty-core could not be reached while connecting | reconnect with backoff, call [POST /sync](#post-sync) |
 | `1012` | gateway restart (sent by uvicorn on shutdown) | reconnect with backoff, call [POST /sync](#post-sync) |
 
 - The web app may refresh the token about 1 minute before `exp` and reconnect early, so the socket is not closed with `4001`.

@@ -90,7 +90,7 @@ The web app keeps one number per channel: the last `seq` it has applied (`last_s
 | `seq` = `last_seen` + 1 | Apply it and set `last_seen = seq` |
 | `seq` > `last_seen` + 1 | There is a gap. Do **not** apply it. Call [GET /channels/{channel_id}/events](api-chat.md#get-channels-channel_id-events) with `after_seq=last_seen`, apply the returned events in order, then apply this one |
 
-**After a reconnect** (close codes `4001`, `4002`, `4008`, `1011`, `1012`, or a dropped network)
+**After a reconnect** (close codes `4001`, `4002`, `4008`, `1001`, `1009`, `1011`, `1012`, or a dropped network)
 1. Reconnect the WebSocket. Events that arrive meanwhile are held back until step 2 is done.
 2. Call [POST /sync](api-chat.md#post-sync) with `last_seen` of every channel the web app has open.
 3. Apply the returned events of each channel in order, then release the held-back ones (the duplicate rule drops the ones already applied).
@@ -110,7 +110,7 @@ The web app keeps one number per channel: the last `seq` it has applied (`last_s
 <a id="ws-client"></a>
 ## WebSocket: client → server
 
-Connect with `GET /api/chat/v1/ws?token=<JWT>` (see [GET /ws](api-chat.md#get-ws)). Messages are JSON text frames. Invalid JSON and unknown message types are ignored: the server sends no `error` and the socket stays open.
+Connect with `GET /api/chat/v1/ws?token=<JWT>` (see [GET /ws](api-chat.md#get-ws)). Messages are JSON text frames of at most 4 KB; a bigger one closes the socket with [`1009`](#ws-close). Invalid JSON, unknown message types and binary frames are ignored: the server sends no `error` and the socket stays open.
 
 <a id="ws-heartbeat"></a>
 ### heartbeat
@@ -212,8 +212,11 @@ A channel event inside a wrapper.
 | `4001` | `token_expired` | refresh the token through chatty-core, reconnect, then [POST /sync](api-chat.md#post-sync) |
 | `4002` | `heartbeat_timeout` | reconnect, then `POST /sync` (no token refresh) |
 | `4003` | `user_inactive` | log out |
-| `4008` | `too_many_messages` | wait, reconnect, then `POST /sync` |
-| `1011` | chatty-core could not be reached while connecting | reconnect with backoff, then `POST /sync` |
+| `4008` | `too_many_messages` (planned, not sent yet) | wait, reconnect, then `POST /sync` |
+| `1001` | `gateway_restart`: the gateway lost Redis and reconnected, so it may have missed events | reconnect with backoff, then `POST /sync` |
+| `1001` | `too_slow`: the socket didn't take an event within 5 s | reconnect, then `POST /sync` |
+| `1009` | a client message over 4 KB (sent by uvicorn) | a bug in the web app; reconnect, then `POST /sync` |
+| `1011` | `core_unavailable`: chatty-core could not be reached while connecting | reconnect with backoff, then `POST /sync` |
 | `1012` | gateway restart (sent by uvicorn on shutdown) | reconnect with backoff, then `POST /sync` |
 
 - The web app can refresh the token about 1 minute before `exp` and reconnect early, so the socket is never closed with `4001`.
