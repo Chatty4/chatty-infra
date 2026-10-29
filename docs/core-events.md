@@ -92,6 +92,9 @@ A user was added to a channel, removed from it, changed their settings for it, o
 - Deletes `members:{user_id}` and `channel:{channel_id}`.
 - `added`: the gateways subscribe the user's sockets to the channel.
 - `removed`: the gateways unsubscribe them right away, so the user gets no more events of the channel.
+  Known limitation (CHAT-271): a socket that is still connecting when the event arrives misses it, and gets the
+  channel's new events until it reconnects, at most 15 minutes (the access token lifetime). History and
+  `POST /sync` check access on every request, so they are not affected.
 - `settings`: only the cache. Mute and notify level are used for push.
 
 ---
