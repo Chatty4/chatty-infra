@@ -74,6 +74,7 @@ Every channel event has the same shape everywhere: on the WebSocket, in the answ
 
 - `seq` is only unique inside one channel. Two channels can both have `seq: 5`.
 - The same event is never changed after it is written. A correction is a new event (for example `message.edited`).
+- One exception: deleting a message clears `body` and `mentions` in that message's earlier `message.created` and `message.edited` events, in the same transaction, so the deleted text can't be read back through `GET /channels/{channel_id}/events` or `POST /sync`. Their `seq`, `type` and the rest of the payload stay. Events already sent over the WebSocket can't be taken back.
 
 ---
 
@@ -302,6 +303,7 @@ A message was deleted (soft delete).
 - Sent by: [DELETE /messages/{message_id}](api-chat.md#delete-messages-message_id)
 - `deleted_by` can be the author, the channel owner or a team owner or admin.
 - The web app shows the message as deleted, removes its files, reactions and mentions, and removes it from the pins. There is no separate `pin.removed` for that.
+- The message's earlier `message.created` and `message.edited` events lose their `body` and `mentions` in the stored history ([the event envelope](#envelope)), so a later sync shows no deleted text.
 
 <a id="event-reaction-added"></a>
 ## reaction.added

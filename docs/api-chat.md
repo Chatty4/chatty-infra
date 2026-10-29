@@ -257,7 +257,7 @@ Edit the text of my message. `body` is the only editable field, so the request a
 
 <a id="delete-messages-message_id"></a>
 ## DELETE /messages/{message_id}
-Delete a message. It is a soft delete: the message stays in its place as "deleted", its pins are removed, and chatty-chat calls chatty-core's `detach` for its files (D-03).
+Delete a message. It is a soft delete: the message stays in its place as "deleted", its pins are removed, and chatty-chat calls chatty-core's `detach` for its files (D-03). Its text is also cleared from its earlier `message.created` and `message.edited` events, so [GET /channels/{channel_id}/events](#get-channels-channel_id-events) and [POST /sync](#post-sync) don't return it ([events.md, the event envelope](events.md#envelope)).
 
 **Auth:** `Authorization: Bearer <JWT>`
 
@@ -862,6 +862,7 @@ Every change in a channel is one event with the next `seq` of that channel. The 
 }
 ```
 - The web app shows the message as deleted, removes its files and reactions, and removes it from the pins
+- The message's earlier `message.created` and `message.edited` events lose their `body` and `mentions` in the stored history, so a later sync shows no deleted text
 
 <a id="event-reaction-added"></a>
 ## reaction.added
