@@ -476,6 +476,7 @@ Remove my reaction. Removing a reaction I don't have does nothing.
 **Errors**
 | Status | code | When |
 |---|---|---|
+| 400 | `validation_error` | the emoji is empty, too long or not an emoji |
 | 403 | `not_a_member` | user is not in the channel |
 | 404 | `message_not_found` | the message doesn't exist, or the user can't read its channel |
 | 409 | `channel_archived` | the channel is archived or its team was deleted |
