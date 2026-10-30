@@ -844,6 +844,50 @@
           }
         },
         {
+          "name": "PUT /messages/:message_id/reactions/:emoji",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{chat_url}}/api/chat/v1/messages/:message_id/reactions/:emoji",
+              "host": ["{{chat_url}}"],
+              "path": ["api", "chat", "v1", "messages", ":message_id", "reactions", ":emoji"],
+              "variable": [
+                { "key": "message_id", "value": "{{message_id}}" },
+                {
+                  "key": "emoji",
+                  "value": "%F0%9F%91%8D",
+                  "description": "one emoji, URL-encoded: %F0%9F%91%8D is 👍, %F0%9F%8E%89 is 🎉"
+                }
+              ]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        },
+        {
+          "name": "DELETE /messages/:message_id/reactions/:emoji",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{chat_url}}/api/chat/v1/messages/:message_id/reactions/:emoji",
+              "host": ["{{chat_url}}"],
+              "path": ["api", "chat", "v1", "messages", ":message_id", "reactions", ":emoji"],
+              "variable": [
+                { "key": "message_id", "value": "{{message_id}}" },
+                {
+                  "key": "emoji",
+                  "value": "%F0%9F%91%8D",
+                  "description": "one emoji, URL-encoded: %F0%9F%91%8D is 👍, %F0%9F%8E%89 is 🎉"
+                }
+              ]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        },
+        {
           "name": "DELETE /messages/:message_id",
           "request": {
             "method": "DELETE",
