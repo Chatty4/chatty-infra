@@ -74,6 +74,7 @@ Every channel event has the same shape everywhere: on the WebSocket, in the answ
 
 - `seq` is only unique inside one channel. Two channels can both have `seq: 5`.
 - The same event is never changed after it is written. A correction is a new event (for example `message.edited`).
+- One exception: deleting a message clears `body` and `mentions` in that message's earlier `message.created` and `message.edited` events, in the same transaction, so the deleted text can't be read back through `GET /channels/{channel_id}/events` or `POST /sync`. Their `seq`, `type` and the rest of the payload stay. Events already sent over the WebSocket can't be taken back.
 
 ---
 
@@ -90,7 +91,7 @@ The web app keeps one number per channel: the last `seq` it has applied (`last_s
 | `seq` = `last_seen` + 1 | Apply it and set `last_seen = seq` |
 | `seq` > `last_seen` + 1 | There is a gap. Do **not** apply it. Call [GET /channels/{channel_id}/events](api-chat.md#get-channels-channel_id-events) with `after_seq=last_seen`, apply the returned events in order, then apply this one |
 
-**After a reconnect** (close codes `4001`, `4002`, `4008`, `1001`, or a dropped network)
+**After a reconnect** (close codes `4001`, `4002`, `4008`, `1001`, `1009`, `1011`, `1012`, or a dropped network)
 1. Reconnect the WebSocket. Events that arrive meanwhile are held back until step 2 is done.
 2. Call [POST /sync](api-chat.md#post-sync) with `last_seen` of every channel the web app has open.
 3. Apply the returned events of each channel in order, then release the held-back ones (the duplicate rule drops the ones already applied).
@@ -110,7 +111,7 @@ The web app keeps one number per channel: the last `seq` it has applied (`last_s
 <a id="ws-client"></a>
 ## WebSocket: client → server
 
-Connect with `GET /api/chat/v1/ws?token=<JWT>` (see [GET /ws](api-chat.md#get-ws)). Messages are JSON text frames. Invalid JSON and unknown message types are ignored: the server sends no `error` and the socket stays open.
+Connect with `GET /api/chat/v1/ws?token=<JWT>` (see [GET /ws](api-chat.md#get-ws)). Messages are JSON text frames of at most 4 KB; a bigger one closes the socket with [`1009`](#ws-close). Invalid JSON, unknown message types and binary frames are ignored: the server sends no `error` and the socket stays open.
 
 <a id="ws-heartbeat"></a>
 ### heartbeat
@@ -212,8 +213,12 @@ A channel event inside a wrapper.
 | `4001` | `token_expired` | refresh the token through chatty-core, reconnect, then [POST /sync](api-chat.md#post-sync) |
 | `4002` | `heartbeat_timeout` | reconnect, then `POST /sync` (no token refresh) |
 | `4003` | `user_inactive` | log out |
-| `4008` | `too_many_messages` | wait, reconnect, then `POST /sync` |
-| `1001` | gateway restart | reconnect with backoff, then `POST /sync` |
+| `4008` | `too_many_messages` (planned, not sent yet) | wait, reconnect, then `POST /sync` |
+| `1001` | `gateway_restart`: the gateway lost Redis and reconnected, so it may have missed events | reconnect with backoff, then `POST /sync` |
+| `1001` | `too_slow`: the socket didn't take an event within 5 s | reconnect, then `POST /sync` |
+| `1009` | a client message over 4 KB (sent by uvicorn) | a bug in the web app; reconnect, then `POST /sync` |
+| `1011` | `core_unavailable`: chatty-core could not be reached while connecting | reconnect with backoff, then `POST /sync` |
+| `1012` | gateway restart (sent by uvicorn on shutdown) | reconnect with backoff, then `POST /sync` |
 
 - The web app can refresh the token about 1 minute before `exp` and reconnect early, so the socket is never closed with `4001`.
 - When the user is removed from a channel, the gateway stops sending that channel's events. It sends no message about it: the sidebar updates from chatty-core.
@@ -298,6 +303,7 @@ A message was deleted (soft delete).
 - Sent by: [DELETE /messages/{message_id}](api-chat.md#delete-messages-message_id)
 - `deleted_by` can be the author, the channel owner or a team owner or admin.
 - The web app shows the message as deleted, removes its files, reactions and mentions, and removes it from the pins. There is no separate `pin.removed` for that.
+- The message's earlier `message.created` and `message.edited` events lose their `body` and `mentions` in the stored history ([the event envelope](#envelope)), so a later sync shows no deleted text.
 
 <a id="event-reaction-added"></a>
 ## reaction.added
@@ -393,7 +399,7 @@ Every channel event is also written to Kafka, for the services that are not the 
 
 **Delivery:** at least once. A duplicate is harmless: the web app ignores a `seq` it already has, and the push worker skips events it already sent.
 
-**Until the Kafka epic lands** (sprints 5 to 6), the gateways read events from Redis pub/sub behind the same `EventBus` interface. The JSON is the same, so the web app does not change.
+**Until the Kafka epic lands** (sprints 5 to 6), chatty-chat publishes each event on Redis pub/sub (`chat.events:{channel_id}`) after the commit, and each gateway subscribes to the channels of its open sockets. The JSON is the same, so the web app does not change.
 
 <a id="kafka-consumers"></a>
 ## Consumers
