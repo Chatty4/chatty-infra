@@ -324,3 +324,5 @@ Health check for Docker and monitoring. Note: the path is `/health`, not under `
 ```
 
 **Response 503**: the same body, with `"status": "degraded"` and the failing dependency set to `"error"`.
+
+`minio` is **planned**: chatty-core checks it once files are built. Until then the body has only `db` and `redis`.
