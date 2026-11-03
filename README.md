@@ -72,6 +72,6 @@ them here first, in their own PR, before changing a service.
 
 ## Postman
 
-`postman/chatty.postman_collection.json` has a request for every chatty-core endpoint, and
+`postman/chatty.postman_collection.json` has a request for every built chatty-core and chatty-chat endpoint, and
 `postman/chatty-local.postman_environment.json` points it at the local stack. Import both into Postman, or
 run the collection with the Postman CLI.
