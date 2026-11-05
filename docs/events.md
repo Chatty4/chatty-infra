@@ -95,6 +95,7 @@ The web app keeps one number per channel: the last `seq` it has applied (`last_s
 1. Reconnect the WebSocket. Events that arrive meanwhile are held back until step 2 is done.
 2. Call [POST /sync](api-chat.md#post-sync) with `last_seen` of every channel the web app has open.
 3. Apply the returned events of each channel in order, then release the held-back ones (the duplicate rule drops the ones already applied).
+4. Call [GET /unread](api-chat.md#get-unread) for the current team. `unread` messages are not stored, so the ones sent while the socket was closed are lost.
 
 **When the answer says the gap is too big**
 - `POST /sync` returns `gap_too_large: true` for a channel, or `GET …/events` returns `409 gap_too_large`. This happens when more than 500 events are missing, or they are older than 30 days.
@@ -184,6 +185,9 @@ A channel event inside a wrapper.
 { "type": "unread", "channel_id": "42aa…", "unread": 0, "mentions": 0 }
 ```
 - The new counts of one channel. Sent to the user's other tabs and devices after [POST /channels/{channel_id}/read](api-chat.md#post-channels-channel_id-read). `unread` is capped at 100 (the UI shows 99+).
+- How it reaches every tab: after the commit, chatty-chat publishes it on the Redis pub/sub channel `chat.users:{user_id}`. Each gateway subscribes to `chat.users:{user_id}` while it holds at least one
+  socket of that user, and unsubscribes when the last one closes. Exact channels only, never `PSUBSCRIBE chat.users:*`, so a gateway gets only its own users' messages.
+
 
 <a id="ws-channel-updated"></a>
 ### channel.updated

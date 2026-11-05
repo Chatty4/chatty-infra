@@ -625,7 +625,7 @@ Mark the channel as read up to `seq`. The read position only moves forward, so a
   "mentions": 0
 }
 ```
-- The new counts are also sent as an `unread` message on the WebSocket to the user's other tabs and devices
+- The new counts are also sent as an `unread` message on the WebSocket to the user's other tabs and devices. A tab that was disconnected gets the counts from GET /unread after it reconnects.
 
 **Errors**
 | Status | code | When |
@@ -638,7 +638,8 @@ Mark the channel as read up to `seq`. The read position only moves forward, so a
 
 <a id="get-unread"></a>
 ## GET /unread
-Unread messages and unread mentions of every channel I am in, in one team. Used for the sidebar badges.
+Unread messages and unread mentions of every channel I am in, in one team. Used for the sidebar badges. Called when the app loads,
+when the user switches team, and after every WebSocket reconnect.
 
 **Auth:** `Authorization: Bearer <JWT>`
 
@@ -824,7 +825,7 @@ Every change in a channel is one event with the next `seq` of that channel. The 
 }
 ```
 
-**Client rule:** ignore if `seq` <= last seen. If `seq` > last seen + 1, call [GET /channels/{channel_id}/events](#get-channels-channel_id-events) with `after_seq` = last seen. After a reconnect, call [POST /sync](#post-sync). The full rules are in [events.md](events.md#client-rules).
+**Client rule:** ignore if `seq` <= last seen. If `seq` > last seen + 1, call [GET /channels/{channel_id}/events](#get-channels-channel_id-events) with `after_seq` = last seen. After a reconnect, call [POST /sync](#post-sync) and [GET /unread](#get-unread). The full rules are in [events.md](events.md#client-rules).
 
 <a id="event-message-created"></a>
 ## message.created

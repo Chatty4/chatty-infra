@@ -113,3 +113,16 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
 - **Why:** Owners and admins can see and revoke every invite, and a member's invites are revoked when they leave or are removed. Blocking `max_age: 0` for members would not stop a leaked 7-day link either.
 - **Rejected:** only owners and admins can create invites that never expire (a new 403 case and a role check, for little gain).
 - **Plan impact:** none (CHAT-256).
+
+## D-12: Sending `unread` to the user's other tabs
+- **Status:** accepted
+- **Decision:**
+  - chatty-chat publishes `unread` on Redis pub/sub `chat.users:{user_id}`, after the commit.
+  - Gateways subscribe to that exact channel while they hold a socket of the user.
+  - The web app calls `GET /unread` after every reconnect, so a lost `unread` is fixed.
+- **Why:** a user's tabs can sit on different gateways, and the existing channels are per channel,
+  not per user. Pub/sub with exact channels costs Redis one small delivery per read.
+- **Rejected:** `PSUBSCRIBE chat.users:*` (every gateway gets every user's messages);
+  publishing on `chat.events:{channel_id}` (other members would see your read position);
+  Redis Streams (acks and trimming for a message that the next `GET /unread` replaces anyway).
+- **Plan impact:** CHAT-208 (+2–3 h for the gateway changes).
