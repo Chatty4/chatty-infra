@@ -995,6 +995,26 @@
       ]
     },
     {
+      "name": "Presence (chatty-chat)",
+      "item": [
+        {
+          "name": "GET /teams/:team_id/presence",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{chat_url}}/api/chat/v1/teams/:team_id/presence",
+              "host": ["{{chat_url}}"],
+              "path": ["api", "chat", "v1", "teams", ":team_id", "presence"],
+              "variable": [{ "key": "team_id", "value": "{{team_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "Internal (chatty-core, for chatty-chat)",
       "item": [
         {
