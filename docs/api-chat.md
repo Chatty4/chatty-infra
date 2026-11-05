@@ -33,6 +33,9 @@ Source: the chatty-chat Confluence page (sections 5 and 8) and `docs/decisions.m
 - [GET /unread](#get-unread)
 - [GET /search](#get-search) (post-MVP)
 
+**Presence**
+- [GET /teams/{team_id}/presence](#get-teams-team_id-presence)
+
 **WebSocket**
 - [GET /ws](#get-ws)
 
@@ -723,6 +726,35 @@ Full-text search in the messages of one team. *Post-MVP*
 
 ---
 
+# Presence
+
+<a id="get-teams-team_id-presence"></a>
+## GET /teams/{team_id}/presence
+Who is online in a team right now. The web app calls it once per team, after the [WebSocket](#get-ws) is open, and then follows the `presence` messages. In the other order, a change between the two would be lost.
+
+**Auth:** `Authorization: Bearer <JWT>`
+
+**Who:** members of the team
+
+**Response 200**
+```json
+{
+  "team_id": "t1…",
+  "online": ["u3…", "u7…"]
+}
+```
+- `online`: the IDs of the team members with at least one open WebSocket. Everyone else in the team is offline. Names and avatars come from chatty-core's [team members](api-core.md#get-teams-team_id-members)
+- A hidden tab counts as online. `visible` in the heartbeat doesn't change presence
+- Not paginated
+
+**Errors**
+| Status | code | When |
+|---|---|---|
+| 400 | `validation_error` | `team_id` is not a UUID |
+| 403 | `not_a_team_member` | the user is not in the team |
+
+---
+
 # WebSocket
 
 <a id="get-ws"></a>
@@ -787,7 +819,7 @@ GET /api/chat/v1/ws?token=eyJhbGciOiJSUzI1NiIs…
 ```
 - `event`: one channel event, see [events](#events)
 - `typing`: the web app hides it after 5 s
-- `presence`: `online` or `offline`, sent to the members of each team the user is in
+- `presence`: `online` or `offline`, sent to the members of each team the user is in, only when it changes. For who is online now, see [GET /teams/{team_id}/presence](#get-teams-team_id-presence)
 - `channel.updated`: forwarded from chatty-core so the sidebar refreshes
 - `error`: a client message was rejected; the socket stays open
 

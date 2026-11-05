@@ -126,7 +126,7 @@ A user joined a team, left it, was removed from it, or got a new role in it.
 
 **chatty-chat**
 - Deletes `members:{user_id}`.
-- `joined`: nothing else. The user's channels arrive as `membership.changed` events.
+- `joined`: the gateways with a socket of the user start their presence in the team and send `online` there. The user's channels arrive as `membership.changed` events.
 - `left` / `removed`: the gateways unsubscribe the user from all channels of the team and stop their presence there.
 - `role_changed`: the new role applies to delete rights, from the next request ([D-05](decisions.md)).
 

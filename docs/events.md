@@ -177,7 +177,7 @@ A channel event inside a wrapper.
 ```json
 { "type": "presence", "team_id": "t1…", "user_id": "u3…", "status": "online" }
 ```
-- `status`: `online` or `offline`. Sent to the members of every team the user is in.
+- `status`: `online` or `offline`. Sent to the members of every team the user is in, only when it changes: `online` for the user's first open socket, `offline` after the last one closes. For who is online now, see [GET /teams/{team_id}/presence](api-chat.md#get-teams-team_id-presence).
 
 <a id="ws-unread"></a>
 ### unread
