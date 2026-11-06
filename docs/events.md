@@ -127,7 +127,8 @@ Connect with `GET /api/chat/v1/ws?token=<JWT>` (see [GET /ws](api-chat.md#get-ws
 ```json
 { "type": "typing", "channel_id": "42aa…" }
 ```
-- At most once every 3 s per channel, only in channels the user can write in.
+- At most once every 3 s per channel, only in channels the user can write in. A `typing` sent too soon, or for a channel the user can't write in, is ignored without an `error`, and the socket stays open.
+- It doesn't reset the 60 s heartbeat timer.
 
 <a id="ws-watch"></a>
 ### watch
@@ -170,7 +171,10 @@ A channel event inside a wrapper.
 ```json
 { "type": "typing", "channel_id": "42aa…", "user_id": "u3…" }
 ```
-- Someone is typing. The web app hides it after 5 s.
+- Someone is typing. The web app hides it after 5 s, or as soon as that user's `message.created` arrives. There is no "stopped typing" message.
+- `user_id` comes from the socket's token, never from the client.
+- Sent to the channel's sockets, plus the sockets that `watch` it, except the typing user's own.
+- How it reaches them: chatty-chat publishes it on the Redis pub/sub channel `chat.typing:{channel_id}`. A gateway subscribes to it together with `chat.events:{channel_id}`, while it holds a socket in the channel. Never stored, so a missed one is gone.
 
 <a id="ws-presence"></a>
 ### presence
