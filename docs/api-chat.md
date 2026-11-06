@@ -786,7 +786,7 @@ GET /api/chat/v1/ws?token=eyJhbGciOiJSUzI1NiIs…
 - `heartbeat`: every 20 s. `visible` says if the tab is on screen (used to skip push notifications). No heartbeat for 60 s means offline, and the socket is closed with `4002`. Only `heartbeat` resets the 60 s timer
 - Invalid JSON, unknown message types and binary frames are ignored without an `error`; the socket stays open
 - A message is at most 4 KB. A bigger one closes the socket with `1009`
-- `typing`: at most once every 3 s per channel, only in channels the user can write in
+- `typing`: at most once every 3 s per channel, only in channels the user can write in. Anything else is ignored without an `error`
 - `watch`: live updates for one public channel the user has not joined but is looking at. Only for channels in the user's `public_channel_ids`. Max 1 per socket; a new `watch` replaces the old one. No read state or unread counts
 
 **Server → client**
@@ -818,7 +818,7 @@ GET /api/chat/v1/ws?token=eyJhbGciOiJSUzI1NiIs…
 { "type": "error", "code": "cannot_watch", "message": "channel is not public in your teams" }
 ```
 - `event`: one channel event, see [events](#events)
-- `typing`: the web app hides it after 5 s
+- `typing`: sent to the channel's sockets and the sockets that `watch` it, except the typing user's own. The web app hides it after 5 s
 - `presence`: `online` or `offline`, sent to the members of each team the user is in, only when it changes. For who is online now, see [GET /teams/{team_id}/presence](#get-teams-team_id-presence)
 - `channel.updated`: forwarded from chatty-core so the sidebar refreshes
 - `error`: a client message was rejected; the socket stays open
