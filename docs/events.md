@@ -134,7 +134,7 @@ Connect with `GET /api/chat/v1/ws?token=<JWT>` (see [GET /ws](api-chat.md#get-ws
 ```json
 { "type": "watch", "channel_id": "c8…" }
 ```
-- Live events of one public channel the user has not joined but is looking at. Only for channels in the user's `public_channel_ids`. One per socket, a new `watch` replaces the old one. No read state or unread counts for it.
+- Live events of one public channel the user has not joined but is looking at. Only for a public channel of one of the user's teams. A channel newer than the cached `public_channel_ids` is looked up in chatty-core. One per socket, a new `watch` replaces the old one. No read state or unread counts for it.
 
 <a id="ws-unwatch"></a>
 ### unwatch
