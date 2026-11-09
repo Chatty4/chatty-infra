@@ -205,7 +205,7 @@ A channel event inside a wrapper.
 
 | `code` | When |
 |---|---|
-| `cannot_watch` | `watch` for a channel that is not in the user's `public_channel_ids` |
+| `cannot_watch` | `watch` for a channel that is not in the user's `public_channel_ids`, or chatty-core can't be reached. The client may send `watch` again |
 
 ---
 
