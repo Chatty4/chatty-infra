@@ -77,7 +77,7 @@ The errors below each endpoint are only the ones specific to it.
 
 | Endpoint | Redis key in chatty-chat | TTL | Cleared by the event |
 |---|---|---|---|
-| [GET /internal/users/{user_id}/memberships](#get-internal-users-user_id-memberships) | `members:{user_id}` | 5 minutes | `membership.changed`, `team.member.changed`, `user.deactivated` |
+| [GET /internal/users/{user_id}/memberships](#get-internal-users-user_id-memberships) | `members:{user_id}` | 5 minutes | `membership.changed`, `team.member.changed`, `user.deactivated`, `team.deleted` |
 | [GET /internal/channels/{channel_id}](#get-internal-channels-channel_id) | `channel:{channel_id}` | 5 minutes | `membership.changed`, `channel.updated`, `team.deleted` |
 
 - chatty-core publishes the events only after its transaction commits, so a call made after the event always returns the new data.
