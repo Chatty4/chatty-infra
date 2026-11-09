@@ -75,7 +75,7 @@ Source: the chatty-core Confluence page (section 4) and `docs/decisions.md`. If 
 - The access token is a JWT signed by chatty-core with RS256. It lives 15 minutes. Claims: `sub` (user id), `iat`, `exp`, `jti`. It has no teams or roles; those are checked on every request.
 - The refresh token lives 30 days and is rotated on every refresh: the old one stops working.
 - Logout, a password change and deactivation delete refresh tokens. Sending a deleted token returns `401 invalid_refresh_token` and changes nothing else.
-- Sending a refresh token that was already rotated counts as theft: every refresh token of the user is deleted, so every device has to log in again. Exception: within 30 seconds of the rotation it only returns `401 invalid_refresh_token`. That is a retry after a lost response, so the other devices stay logged in.
+- Sending a refresh token that was already rotated counts as theft: every refresh token of the user is deleted, so every device has to log in again. Exception: within 30 seconds of the first rotation it is treated as a retry after a lost response: the token is rotated again and a new pair is returned, and the other devices stay logged in.
 - The same access token is used for chatty-chat, which checks it with chatty-core's public key.
 
 **Sending the token**
@@ -87,7 +87,7 @@ Source: the chatty-core Confluence page (section 4) and `docs/decisions.md`. If 
 2. The web app calls [POST /auth/refresh](#post-auth-refresh) once, then repeats the request with the new token.
 3. If the refresh returns `401 invalid_refresh_token`, the user has to log in again.
 - The web app may refresh about 1 minute before `exp` to avoid the failed request.
-- Only one refresh per refresh token. If two tabs refresh with the same token, the second one gets `401` (within 30 s) or logs out every device (later), so the web app must refresh from one tab and share the new tokens with the others.
+- Only one refresh per refresh token. If two tabs refresh with the same token, the second one gets its own new pair (within 30 s) or logs out every device (later), so the web app must refresh from one tab and share the new tokens with the others.
 
 **What the user is allowed to do**
 - The **Who** line of each endpoint says who may call it. It is checked after the token, with the user's role in the team (`owner`, `admin`, `member`) and in the channel (`owner`, `member`).
@@ -281,7 +281,7 @@ Log in with email and password.
 
 <a id="post-auth-refresh"></a>
 ## POST /auth/refresh
-Get a new access token. The refresh token is rotated: the old one stops working. Sending an already rotated token again logs out every device, unless it comes within 30 seconds of the rotation (see [Authorization](#authorization)).
+Get a new access token. The refresh token is rotated: the old one stops working. Sending an already rotated token again logs out every device,unless it comes within 30 seconds of the rotation, which returns a new pair (see [Authorization](#authorization)).
 
 **Auth:** none (the refresh token is sent in the body)
 
@@ -308,7 +308,7 @@ Get a new access token. The refresh token is rotated: the old one stops working.
 **Errors**
 | Status | code | When |
 |---|---|---|
-| 401 | `invalid_refresh_token` | unknown, expired or deleted refresh token; or one that was already rotated, and then every refresh token of the user is deleted too (unless the rotation was less than 30 seconds ago) |
+| 401 | `invalid_refresh_token` | unknown, expired or deleted refresh token; or one that was already rotated, and then every refresh token of the user is deleted too (a rotation less than 30 seconds ago returns a new pair instead) |
 | 403 | `user_inactive` | the user was deactivated |
 
 ---
