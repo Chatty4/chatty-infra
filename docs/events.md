@@ -135,7 +135,7 @@ Connect with `GET /api/chat/v1/ws?token=<JWT>` (see [GET /ws](api-chat.md#get-ws
 ```json
 { "type": "watch", "channel_id": "c8…" }
 ```
-- Live events of one public channel the user has not joined but is looking at. Only for channels in the user's `public_channel_ids`. One per socket, a new `watch` replaces the old one. No read state or unread counts for it.
+- Live events of one public channel the user has not joined but is looking at. Only for a public channel of one of the user's teams. A channel newer than the cached `public_channel_ids` is looked up in chatty-core. One per socket, a new `watch` replaces the old one. No read state or unread counts for it.
 
 <a id="ws-unwatch"></a>
 ### unwatch
@@ -209,7 +209,7 @@ A channel event inside a wrapper.
 
 | `code` | When |
 |---|---|
-| `cannot_watch` | `watch` for a channel that is not in the user's `public_channel_ids` |
+| `cannot_watch` | `watch` for a channel that is not in the user's `public_channel_ids`, or chatty-core can't be reached. The client may send `watch` again |
 
 ---
 
@@ -252,6 +252,7 @@ A message was sent.
       "channel_id": "42aa…",
       "seq": 108,
       "author_id": "u7…",
+      "client_msg_id": "c1b2e0a4-…",
       "body": "deploy at 5? <@u3…>",
       "file_ids": ["f6…"],
       "attachments": [
@@ -269,6 +270,7 @@ A message was sent.
 ```
 - Sent by: [POST /channels/{channel_id}/messages](api-chat.md#post-channels-channel_id-messages)
 - `payload.message` is the full [message object](api-chat.md#message-object). `message.seq` is the same number as the event's `seq`.
+- The author's app uses `message.client_msg_id` to replace its pending copy, so the message doesn't show twice when this event arrives before the POST response.
 - `reactions` is always empty and has no `me`, because the same event goes to everyone.
 - The web app adds the message to the channel. If it already has the message from the REST answer of its own send (same `id`), it keeps one copy.
 
