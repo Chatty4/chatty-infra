@@ -134,6 +134,7 @@ Everything chatty-chat needs to check what a user can read and write (D-07): whe
 ```
 - `teams[].role`: `owner`, `admin` or `member`
 - `teams[].public_channel_ids`: all public channels of the team, joined or not, so chatty-chat lets team members read public channels they haven't joined
+- `public_channel_ids` comes from the `members:{user_id}` cache, so it can miss a public channel created since. For a channel that isn't in `channels` or `public_channel_ids`, chatty-chat calls [GET /internal/channels/{channel_id}](#get-internal-channels-channel_id) and lets the user read it if they are a member, or if it is a public channel of one of their teams that isn't deleted
 - `channels`: only channels the user is a member of. `role`: `owner` or `member`. `kind`: `public`, `private` or `dm`
 - Deleted teams and their channels are left out
 - A deactivated user still returns 200, with `is_active: false`, so chatty-chat can refuse their requests and close their sockets
