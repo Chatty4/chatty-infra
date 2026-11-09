@@ -147,6 +147,7 @@ Returned by the message endpoints and inside `message.created` events.
   "channel_id": "42aa…",
   "seq": 108,
   "author_id": "u7…",
+  "client_msg_id": "c1b2e0a4-…",
   "body": "deploy at 5? <@u3…>",
   "file_ids": ["f6…"],
   "attachments": [
@@ -163,6 +164,7 @@ Returned by the message endpoints and inside `message.created` events.
 }
 ```
 - `seq`: the message's place in the channel. Edits, reactions and pins also take numbers, so gaps between messages are normal.
+- `client_msg_id`: the UUID the author's app sent with [POST /channels/{channel_id}/messages](#post-channels-channel_id-messages). The author's app uses it to replace its pending copy of the message, whether the POST response or the `message.created` event arrives first.
 - `body`: a mention is stored as `<@user_id>`. The web app shows the display name from chatty-core's [team members](api-core.md#get-teams-team_id-members).
 - `mentions`: the mentioned users who are members of the channel. Mentions of other users stay in the text but are not in this list.
 - `attachments`: what chatty-core's `attach` returned (D-03). Download with [GET /attachments/{file_id}](#get-attachments-file_id).
