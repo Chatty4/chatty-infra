@@ -785,7 +785,7 @@ GET /api/chat/v1/ws?token=eyJhbGciOiJSUzI1NiIs…
 ```json
 { "type": "unwatch", "channel_id": "c8…" }
 ```
-- `heartbeat`: every 20 s. `visible` says if the tab is on screen (used to skip push notifications). No heartbeat for 60 s means offline, and the socket is closed with `4002`. Only `heartbeat` resets the 60 s timer
+- `heartbeat`: every 20 s, and right away when the tab is shown or hidden. `visible` says if the tab is on screen (used to skip push notifications; the gateway keeps visible sockets in Redis `visible:{user_id}`, see [events.md](events.md#ws-heartbeat)). No heartbeat for 60 s means offline, and the socket is closed with `4002`. Only `heartbeat` resets the 60 s timer
 - Invalid JSON, unknown message types and binary frames are ignored without an `error`; the socket stays open
 - A message is at most 4 KB. A bigger one closes the socket with `1009`
 - `typing`: at most once every 3 s per channel, only in channels the user can write in. Anything else is ignored without an `error`
