@@ -398,6 +398,7 @@ Every channel event is also written to Kafka, for the services that are not the 
 | Value | the [envelope](#envelope) as JSON, the same as on the WebSocket: `{type, channel_id, seq, created_at, payload}` |
 | Broker | 1 broker in KRaft mode (no ZooKeeper) for dev and the MVP |
 | Python client | `aiokafka` |
+| Created by | `setup.bat` (chatty-infra). Auto-create is off, so writing to a missing topic is an error, not a new topic |
 
 - Only [channel events](#where) are written. `typing`, `presence`, `unread` and `channel.updated` never go to Kafka.
 - The REST history keeps events for 30 days, Kafka for 7. The web app recovers with REST, never with Kafka.
