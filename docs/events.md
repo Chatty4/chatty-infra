@@ -119,8 +119,13 @@ Connect with `GET /api/chat/v1/ws?token=<JWT>` (see [GET /ws](api-chat.md#get-ws
 ```json
 { "type": "heartbeat", "visible": true }
 ```
-- Every 20 s. `visible` is true when the tab is on screen (a visible tab gets no push notification). No heartbeat for 60 s means the user is offline, and the socket is closed with [`4002`](#ws-close).
+- Every 20 s, and right away when the tab is shown or hidden (`visibilitychange`). `visible` is true when the tab is on screen (a visible tab gets no push notification). No heartbeat for 60 s means the user is offline, and the socket is closed with [`4002`](#ws-close).
 - Only `heartbeat` resets the 60 s timer; other messages don't.
+- Where `visible` is kept: the push worker runs in another process, so the gateway stores the user's visible sockets in Redis, in the sorted set `visible:{user_id}`:
+  - member: the socket ID; score: the time of that socket's last heartbeat with `visible: true`; 60 s TTL, refreshed on every write
+  - `visible: true` adds or refreshes the socket. `visible: false` and closing the socket remove it
+  - The push worker sends no push to a user with at least one socket there whose score is less than 45 s old. A socket whose gateway crashed is never removed, but stops counting after 45 s
+  - One entry per socket, because a user can have a visible tab on one device and a hidden one on another. Presence (`presence:{user_id}`) is separate: a hidden tab is still online
 
 <a id="ws-typing-out"></a>
 ### typing
