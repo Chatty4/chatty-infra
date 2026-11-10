@@ -91,7 +91,10 @@ call "%LIB%" :confirm "Start everything again now?"
 if "!CONFIRMED!"=="1" (
     set "CHATTY_NO_PAUSE=1"
     call "%ROOT%\start.bat" all
+    call "%LIB%" :create_kafka_topic
     call :offer_migrate
+) else (
+    call "%LIB%" :hint "The Kafka topic was deleted too. setup.bat creates it again."
 )
 goto :done
 
