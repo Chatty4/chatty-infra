@@ -126,3 +126,22 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
   publishing on `chat.events:{channel_id}` (other members would see your read position);
   Redis Streams (acks and trimming for a message that the next `GET /unread` replaces anyway).
 - **Plan impact:** CHAT-208 (+2–3 h for the gateway changes).
+
+## D-13: Push subscriptions live in chatty-chat
+- **Status:** accepted
+- **Decision:**
+  - chatty-chat stores the Web Push subscriptions (table `push_subscriptions`) and has both endpoints:
+    [POST /push/subscriptions](api-chat.md#post-push-subscriptions) and
+    [DELETE /push/subscriptions](api-chat.md#delete-push-subscriptions).
+  - chatty-core has no push endpoints, public or internal.
+  - The VAPID public key is in chatty-web's `.env`; it isn't secret, so there is no endpoint for it.
+    The private key is only in chatty-chat.
+- **Why:** the push worker runs in chatty-chat, so it reads and deletes subscriptions in its own
+  database: no HTTP call to chatty-core per message, and pushes keep working while chatty-core is down.
+  A subscription is a delivery address for one browser, not profile data; like read state, it lives
+  with the service that uses it.
+- **Cost:** when chatty-core deactivates a user, their subscriptions stay until the push service answers
+  `404` or `410 Gone`, and the worker deletes them then.
+- **Rejected:** subscriptions in chatty-core with two internal endpoints for the push worker (two more
+  endpoints and an HTTP call per message, for no gain); an endpoint for the VAPID public key.
+- **Plan impact:** replaces the push sections of `api-core.md` and `api-internal.md`.

@@ -36,6 +36,10 @@ Source: the chatty-chat Confluence page (sections 5 and 8) and `docs/decisions.m
 **Presence**
 - [GET /teams/{team_id}/presence](#get-teams-team_id-presence)
 
+**Push**
+- [POST /push/subscriptions](#post-push-subscriptions)
+- [DELETE /push/subscriptions](#delete-push-subscriptions)
+
 **WebSocket**
 - [GET /ws](#get-ws)
 
@@ -754,6 +758,81 @@ Who is online in a team right now. The web app calls it once per team, after the
 |---|---|---|
 | 400 | `validation_error` | `team_id` is not a UUID |
 | 403 | `not_a_team_member` | the user is not in the team |
+
+---
+
+# Push
+
+Web Push for browsers where Chatty isn't open. The browser's `pushManager.subscribe()` gives the web app
+a subscription: `endpoint` (the URL of the browser's push service), `p256dh` (the browser's public key)
+and `auth` (a shared secret). chatty-chat stores it, and its push worker sends to it ([D-13](decisions.md)).
+
+- A subscription belongs to one browser, not to a team: it gets pushes from all of the user's teams.
+- Whether a push is sent depends on the channel settings from chatty-core (`notify_level`, `muted`) and on
+  the tab being hidden (`visible` in the [heartbeat](#get-ws)).
+- `endpoint`, `p256dh` and `auth` are never logged and never returned by any endpoint.
+
+<a id="post-push-subscriptions"></a>
+## POST /push/subscriptions
+Save this browser's subscription for the current user. The web app calls it after the user allows
+notifications, and again on every app start, because browsers sometimes change the subscription.
+
+**Auth:** `Authorization: Bearer <JWT>`
+
+**Who:** logged-in user
+
+**Request**
+```json
+{
+  "endpoint": "https://fcm.googleapis.com/fcm/send/…",
+  "p256dh": "BOr…",
+  "auth": "k8J…"
+}
+```
+- `endpoint`: an `https://` URL, at most 2048 characters
+- `p256dh`: base64url, 65 bytes once decoded
+- `auth`: base64url, 16 bytes once decoded
+
+**Response 204** (no body)
+- Saved by `endpoint`: a new endpoint is added; a known one gets the new keys.
+- If the endpoint belongs to another user (a shared computer), it moves to the current user, so the
+  browser only gets pushes for whoever is logged in.
+
+**Errors**
+| Status | code | When |
+|---|---|---|
+| 400 | `validation_error` | `endpoint` is not an `https` URL or is too long, or a key is missing or not valid base64url |
+
+---
+
+<a id="delete-push-subscriptions"></a>
+## DELETE /push/subscriptions
+Stop push notifications for this browser. The web app calls it when the user turns notifications off,
+and on logout **before** chatty-core's [POST /auth/logout](api-core.md#post-auth-logout), while the
+access token still works.
+
+**Auth:** `Authorization: Bearer <JWT>`
+
+**Who:** logged-in user
+
+**Request**
+```json
+{
+  "endpoint": "https://fcm.googleapis.com/fcm/send/…"
+}
+```
+- The endpoint is in the body, not the URL, so it never ends up in access logs. The web app reads it from
+  `pushManager.getSubscription()`.
+
+**Response 204** (no body)
+- Deletes the subscription only if it belongs to the current user.
+- Also 204 if there was nothing to delete, so calling it twice is safe and it doesn't reveal other
+  users' subscriptions.
+
+**Errors**
+| Status | code | When |
+|---|---|---|
+| 400 | `validation_error` | `endpoint` is missing or not an `https` URL |
 
 ---
 

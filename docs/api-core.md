@@ -55,10 +55,6 @@ Source: the chatty-core Confluence page (section 4) and `docs/decisions.md`. If 
 - [GET /files/{file_id}](#get-files-file_id)
 - [DELETE /files/{file_id}](#delete-files-file_id)
 
-**Push (post-MVP)**
-- [POST /push/subscriptions](#post-push-subscriptions)
-- [DELETE /push/subscriptions/{subscription_id}](#delete-push-subscriptions-subscription_id)
-
 **Other**
 - [Authorization](#authorization)
 - [Errors that every endpoint can return](#common-errors)
@@ -1407,58 +1403,6 @@ Delete my own file before it is used in a message. Files in messages are removed
 | 403 | `forbidden` | the file is not mine |
 | 404 | `file_not_found` | the file doesn't exist or was already deleted |
 | 409 | `file_attached` | the file is in a message (`attached_at` is set) |
-
----
-
-# Push (post-MVP)
-
-<a id="post-push-subscriptions"></a>
-## POST /push/subscriptions
-Register this browser for Web Push. If the same `endpoint` exists, it is moved to the current user.
-
-**Auth:** `Authorization: Bearer <JWT>`
-
-**Who:** logged-in user
-
-**Request**
-```json
-{
-  "endpoint": "https://fcm.googleapis.com/fcm/send/…",
-  "p256dh": "BOr…",
-  "auth": "k8J…"
-}
-```
-
-**Response 201** (200 if the endpoint was already registered)
-```json
-{
-  "id": "p1…",
-  "created_at": "2026-10-06T12:00:00Z"
-}
-```
-
-**Errors**
-| Status | code | When |
-|---|---|---|
-| 400 | `validation_error` | endpoint is not an https URL, keys missing |
-
----
-
-<a id="delete-push-subscriptions-subscription_id"></a>
-## DELETE /push/subscriptions/{subscription_id}
-Stop push notifications for this browser.
-
-**Auth:** `Authorization: Bearer <JWT>`
-
-**Who:** the owner of the subscription
-
-**Response 204** (no body)
-
-**Errors**
-| Status | code | When |
-|---|---|---|
-| 403 | `forbidden` | the subscription is not mine |
-| 404 | `subscription_not_found` | the subscription doesn't exist |
 
 ---
 

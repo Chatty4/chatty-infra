@@ -16,10 +16,6 @@ Source: the chatty-core Confluence page (section 4, internal endpoints) and `doc
 - [POST /internal/files/{file_id}/attach](#post-internal-files-file_id-attach)
 - [POST /internal/files/{file_id}/detach](#post-internal-files-file_id-detach)
 
-**Push (post-MVP)**
-- [GET /internal/users/{user_id}/push-subscriptions](#get-internal-users-user_id-push-subscriptions)
-- [DELETE /internal/push-subscriptions/{subscription_id}](#delete-internal-push-subscriptions-subscription_id)
-
 **Health**
 - [GET /health](#get-health)
 
@@ -262,45 +258,6 @@ Called when a message with this file is deleted, or when saving the message fail
 | 404 | `file_not_found` | no file with this ID |
 
 - If this call fails, chatty-chat retries it later. If it is lost, the file only stays attached but unused, which is harmless.
-
----
-
-# Push (post-MVP)
-
-<a id="get-internal-users-user_id-push-subscriptions"></a>
-## GET /internal/users/{user_id}/push-subscriptions
-The browsers where a user allowed notifications. chatty-chat's push worker sends Web Push to each of them.
-
-**Auth:** `X-Service-Token: <token>`
-
-**Who:** chatty-chat `push-worker`
-
-**Response 200**
-```json
-{
-  "subscriptions": [
-    {
-      "id": "p1…",
-      "endpoint": "https://fcm.googleapis.com/fcm/send/…",
-      "p256dh": "BOr…",
-      "auth": "k8J…"
-    }
-  ]
-}
-```
-- An empty list if the user has no subscriptions or doesn't exist
-
----
-
-<a id="delete-internal-push-subscriptions-subscription_id"></a>
-## DELETE /internal/push-subscriptions/{subscription_id}
-Called when the push service answers `410 Gone` (the browser revoked permission), so the worker stops sending to it.
-
-**Auth:** `X-Service-Token: <token>`
-
-**Who:** chatty-chat `push-worker`
-
-**Response 204** (no body). Also 204 if it was already deleted.
 
 ---
 

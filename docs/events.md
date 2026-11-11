@@ -423,5 +423,5 @@ Every channel event is also written to Kafka, for the services that are not the 
 | Consumer | Group ID | Starts from | Commits offsets | Why |
 |---|---|---|---|---|
 | Each gateway | `gateway-{instance_id}` (unique per instance) | latest | no | Every gateway must see every event. Missed events are recovered by the client with `POST /sync` |
-| Push worker *(post-MVP)* | `push-worker` (shared) | last committed | yes, after sending | Each event is handled once, even with 2 or more workers |
+| Push worker | `push-worker` (shared) | last committed | yes, after sending | Each event is handled once, even with 2 or more workers. Reads the subscriptions from chatty-chat's own `push_subscriptions` table and deletes them on `404` or `410 Gone` ([D-13](decisions.md)) |
 | Search indexer *(post-MVP)* | `search-indexer` | last committed | yes | Can rebuild the index by replaying the topic |
