@@ -337,6 +337,30 @@ if not "%~3"=="" set "_flags=!_flags! %~3"
 docker compose up !_flags! %~1
 exit /b %errorlevel%
 
+:create_kafka_topic
+:: create_kafka_topic -> starts Kafka if needed and creates chat.events. errorlevel 1 on failure.
+:: Kafka runs with auto-create off, so this is the only place the topic is made. Safe to run again.
+:: 6 partitions: up to 6 push workers share the work, and key = channel_id keeps a channel in order.
+call :check_docker || (
+    call :warn "Skipped the Kafka topic: Docker is not available."
+    exit /b 1
+)
+call :info "Starting Kafka if needed, up to 3 minutes ..."
+call :compose_up "kafka"
+if errorlevel 1 (
+    call :warn "Kafka did not start, so chat.events was not created."
+    call :hint "See: logs.bat kafka"
+    exit /b 1
+)
+docker exec chatty-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic chat.events --partitions 6 --replication-factor 1 --config retention.ms=604800000 >nul
+if errorlevel 1 (
+    call :warn "Could not create the Kafka topic chat.events."
+    call :hint "See: logs.bat kafka"
+    exit /b 1
+)
+call :ok "Kafka topic chat.events is ready: 6 partitions, kept 7 days."
+exit /b 0
+
 :ensure_running
 :: ensure_running <service> -> starts it after asking (or right away when INTERACTIVE=0)
 call :is_running %~1 && exit /b 0

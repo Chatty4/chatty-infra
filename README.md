@@ -13,9 +13,9 @@ You need Git, Docker Desktop and, for local virtualenvs, Python 3.14.
 
 2. Run `setup.bat`. It clones the other repos next to this one on `dev`, creates every `.env` from its
    `.env.example` with matching secrets, creates the JWT key pair in `chatty-core/keys` once (new keys
-   would log everyone out), creates `chatty.code-workspace`, and can set up the virtualenvs
-   and start the stack. It is safe to run again: it never overwrites a value you set and never touches a
-   repo with uncommitted changes.
+   would log everyone out), creates `chatty.code-workspace`, can set up the virtualenvs and start the
+   stack, and last creates the Kafka topic `chat.events` (it starts Kafka for that). It is safe to run
+   again: it never overwrites a value you set and never touches a repo with uncommitted changes.
 
 ```text
 C:\chatty\
@@ -34,7 +34,7 @@ asks, and with arguments it runs without questions (see the top of each file).
 
 | Script | What it does | Without questions |
 |---|---|---|
-| `setup.bat` | Clone the repos, create `.env` files, virtualenvs | `setup.bat --yes` |
+| `setup.bat` | Clone the repos, create `.env` files, virtualenvs, the Kafka topic | `setup.bat --yes` |
 | `start.bat` | Start everything, infra only, or chosen services; waits for health checks | `start.bat all`, `start.bat infra`, `start.bat apps --build` |
 | `stop.bat` | Stop containers, or remove them; data is always kept | `stop.bat all`, `stop.bat apps`, `stop.bat down` |
 | `restart.bat` | Restart, recreate (compose or `.env` changes) or rebuild (`requirements.txt` changes) | `restart.bat core`, `restart.bat chat --build` |
@@ -43,7 +43,7 @@ asks, and with arguments it runs without questions (see the top of each file).
 | `status.bat` | Containers, app health and the branch of every repo; can refresh every 5 seconds | `status.bat --once` |
 | `test.bat` | The CI checks inside the containers: ruff, pre-test checks, pytest; or fix lint | `test.bat all`, `test.bat chat tests` |
 | `shell.bat` | Django shell, bash, psql, redis-cli, MinIO console | `shell.bat psql-core`, `shell.bat redis` |
-| `reset-db.bat` | Wipe `core_db`, `chat_db` or every volume; backs up to `backups\` first | always asks |
+| `reset-db.bat` | Wipe `core_db`, `chat_db` or every volume; backs up to `backups\` first. Every volume also deletes the Kafka topic: it is created again if you start again, otherwise run `setup.bat` | always asks |
 
 The core and chat containers apply pending migrations every time they start, so `migrate.bat` is for
 everything else: status, new migrations, checks and rollbacks. Set `NO_COLOR=1` to turn off colors.
