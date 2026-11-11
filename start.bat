@@ -2,9 +2,9 @@
 :: Starts the Chatty stack in Docker.
 ::
 ::   start.bat                       menu
-::   start.bat all [--build]         infra + chatty-core + chatty-chat
+::   start.bat all [--build]         infra + chatty-core + chatty-chat + relay
 ::   start.bat infra                 only infra, to run core or chat yourself with uvicorn
-::   start.bat apps                  chatty-core + chatty-chat and the infra they need
+::   start.bat apps                  chatty-core + chatty-chat + relay and the infra they need
 ::   start.bat core redis ...        chosen services; their dependencies start too
 ::
 :: --build rebuilds the app images first: needed after requirements.txt or Dockerfile changes.
@@ -22,9 +22,9 @@ if "%INTERACTIVE%"=="0" goto :resolve
 
 echo   What do you want to start?
 echo.
-call "%LIB%" :menu_item 1 "Everything" "infra, chatty-core and chatty-chat"
+call "%LIB%" :menu_item 1 "Everything" "infra, chatty-core, chatty-chat and the relay"
 call "%LIB%" :menu_item 2 "Infra only" "Postgres x2, Redis, MinIO, Kafka. Run core or chat with uvicorn"
-call "%LIB%" :menu_item 3 "Apps" "chatty-core and chatty-chat, plus the infra they need"
+call "%LIB%" :menu_item 3 "Apps" "chatty-core, chatty-chat and the relay, plus their infra"
 call "%LIB%" :menu_item 4 "Pick services" "choose one or more"
 call "%LIB%" :menu_item Q "Quit"
 echo.

@@ -187,6 +187,36 @@ services:
       redis:
         condition: service_healthy
 
+  # Outbox relay (CHAT-189), same image as chat: sends new channel_events rows to Kafka (events.md).
+  # One at a time: it holds a Postgres advisory lock, so a second relay waits for it.
+  # No --reload: after a code change, restart.bat relay.
+  relay:
+    build: ../chatty-chat
+    image: chatty-chat:dev
+    container_name: chatty-relay
+    command: python -m app.jobs.relay
+    env_file:
+      - path: ../chatty-chat/.env
+        required: false
+    environment:
+      # Service names and ports inside the network; these win over chatty-chat/.env.
+      DATABASE_URL: postgresql+asyncpg://${CHAT_DB_USER:-chat_user}:${CHAT_DB_PASSWORD:-chat_pass}@chat-db:5432/${CHAT_DB_NAME:-chat_db}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      # Required by chatty-chat's settings, even though the relay never calls chatty-core.
+      CORE_SERVICE_TOKEN: ${CORE_SERVICE_TOKEN:-change-me}
+    volumes:
+      - ../chatty-chat:/app
+    # The image's health check calls /health on port 8001, which only the API serves.
+    healthcheck:
+      disable: true
+    # Exits when Kafka can't be reached at startup; Docker starts it again.
+    restart: unless-stopped
+    depends_on:
+      chat:
+        condition: service_healthy  # chat's start applies the migrations, the NOTIFY trigger included
+      kafka:
+        condition: service_healthy
+
 volumes:
   core-db-data:
   chat-db-data:
