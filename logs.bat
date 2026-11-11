@@ -3,7 +3,7 @@
 ::
 ::   logs.bat                     menu
 ::   logs.bat core                follow core live
-::   logs.bat apps                follow core and chat together
+::   logs.bat apps                follow core, chat and relay together
 ::   logs.bat all                 follow everything
 ::   logs.bat chat --errors       only error, exception, traceback and warning lines
 setlocal EnableDelayedExpansion

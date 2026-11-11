@@ -31,7 +31,7 @@ set "COMPOSE_FILE=%ROOT%\docker-compose.yml"
 
 :: The one list of services. Start order; container names are chatty-<service>.
 set "INFRA_SERVICES=core-db chat-db redis minio kafka"
-set "APP_SERVICES=core chat"
+set "APP_SERVICES=core chat relay"
 set "ALL_SERVICES=%APP_SERVICES% %INFRA_SERVICES%"
 
 :: Colors (Windows 10+). Set NO_COLOR=1 to turn them off.
@@ -276,6 +276,10 @@ if "%~1"=="core" (
 if "%~1"=="chat" (
     set "SVC_ADDR=http://127.0.0.1:%CFG_CHAT_API_PORT%"
     set "SVC_DESC=chatty-chat API, FastAPI"
+)
+if "%~1"=="relay" (
+    set "SVC_ADDR=-"
+    set "SVC_DESC=outbox relay: channel_events to Kafka"
 )
 if "%~1"=="core-db" (
     set "SVC_ADDR=127.0.0.1:%CFG_CORE_DB_PORT%"
