@@ -128,7 +128,7 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
 - **Plan impact:** CHAT-208 (+2–3 h for the gateway changes).
 
 ## D-13: Push subscriptions live in chatty-chat
-- **Status:** proposed
+- **Status:** accepted
 - **Decision:**
   - chatty-chat stores the Web Push subscriptions (table `push_subscriptions`) and has both endpoints:
     [POST /push/subscriptions](api-chat.md#post-push-subscriptions) and
