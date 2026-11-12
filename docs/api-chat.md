@@ -39,6 +39,7 @@ Source: the chatty-chat Confluence page (sections 5 and 8) and `docs/decisions.m
 **Push**
 - [POST /push/subscriptions](#post-push-subscriptions)
 - [DELETE /push/subscriptions](#delete-push-subscriptions)
+- [Push payload](#push-payload)
 
 **WebSocket**
 - [GET /ws](#get-ws)
@@ -833,6 +834,36 @@ access token still works.
 | Status | code | When |
 |---|---|---|
 | 400 | `validation_error` | `endpoint` is missing or not an `https` URL |
+
+---
+
+<a id="push-payload"></a>
+## Push payload
+What the push worker sends to a browser for a new message. The payload is encrypted for that browser
+(Web Push, aes128gcm), so the push service can't read it.
+
+```json
+{
+  "type": "message",
+  "channel_id": "42aa…",
+  "message_id": "9f3a…",
+  "seq": 108,
+  "mentioned": true,
+  "preview": "deploy at 5? <@u3…>"
+}
+```
+- `preview`: the first 100 characters of the body; empty for a message with only attachments.
+  Mentions stay as `<@user_id>`; the service worker shows a generic text if it can't resolve them.
+- `mentioned`: the user is in the message's `mentions`.
+- The service worker opens `channel_id` on click and loads the message with REST, as after a reconnect.
+
+**Who gets one**, for each `message.created` event:
+- a member of the channel who isn't the author and hasn't muted it, and
+- whose `notify_level` is `all`, or `mentions` and they are mentioned (DMs default to `all`), and
+- who has no Chatty tab on screen (`visible` heartbeat in the last 45 s).
+- One push per user and message, to every browser they subscribed. Events older than 10 minutes are
+  skipped: a late notification is noise.
+- A `404` or `410` from the push service deletes that subscription (D-13).
 
 ---
 
