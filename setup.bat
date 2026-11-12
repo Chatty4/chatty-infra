@@ -80,6 +80,7 @@ call "%LIB%" :step 3 9 "Creating .env files"
 call :env_file "%ROOT%" chatty-infra
 call :env_file "%CORE_DIR%" chatty-core
 call :env_file "%CHAT_DIR%" chatty-chat
+call :env_file "%WORKSPACE%\chatty-web" chatty-web
 
 :: One CORE_SERVICE_TOKEN for chatty-infra (Docker) and chatty-chat (local runs), and a real Django
 :: SECRET_KEY for chatty-core in both. Values that are already set are kept and reused.
@@ -97,6 +98,7 @@ if exist "%ROOT%\.env" (
 if exist "%CHAT_DIR%\.env" call :set_env "%CHAT_DIR%\.env" chatty-chat CORE_SERVICE_TOKEN !NEW_TOKEN!
 if exist "%CORE_DIR%\.env" call :set_env "%CORE_DIR%\.env" chatty-core SECRET_KEY !NEW_SECRET!
 call :vapid_keys
+call :web_vapid_key
 call :minio_secrets
 
 :: ---- 4. JWT keys ----------------------------------------------------------------------------
@@ -276,6 +278,27 @@ if not defined _pub (
 call :set_env "%CHAT_DIR%\.env" chatty-chat VAPID_PRIVATE_KEY !_priv!
 :: The public half only goes with its own private half, so a kept private key keeps its public key.
 if "!_res!"=="set" call :set_env "%CHAT_DIR%\.env" chatty-chat VAPID_PUBLIC_KEY !_pub!
+exit /b 0
+
+:web_vapid_key
+:: chatty-web's VITE_VAPID_PUBLIC_KEY is copied from chatty-chat\.env, so it always matches the key
+:: the push worker signs with. A different key makes every push fail with 403.
+set "_web=%WORKSPACE%\chatty-web\.env"
+if not exist "!_web!" exit /b 0
+if not exist "%CHAT_DIR%\.env" exit /b 0
+set "_pub="
+for /f "tokens=1,* delims==" %%a in ('findstr /b /c:"VAPID_PUBLIC_KEY=" "%CHAT_DIR%\.env"') do set "_pub=%%b"
+if not defined _pub exit /b 0
+:: A .env made before push notifications has no line for the key, and set_env only fills a line that exists.
+findstr /b /c:"VITE_VAPID_PUBLIC_KEY=" "!_web!" >nul || (echo.& echo VITE_VAPID_PUBLIC_KEY=)>>"!_web!"
+call :set_env "!_web!" chatty-web VITE_VAPID_PUBLIC_KEY !_pub!
+if not "!_res!"=="kept" exit /b 0
+set "_webpub="
+for /f "tokens=1,* delims==" %%a in ('findstr /b /c:"VITE_VAPID_PUBLIC_KEY=" "!_web!"') do set "_webpub=%%b"
+if not "!_webpub!"=="!_pub!" (
+    call "%LIB%" :warn "chatty-web\.env: VITE_VAPID_PUBLIC_KEY differs from chatty-chat's VAPID_PUBLIC_KEY. Pushes will fail with 403."
+    set "WARNINGS=1"
+)
 exit /b 0
 
 :minio_secrets

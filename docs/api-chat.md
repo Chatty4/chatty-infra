@@ -845,6 +845,7 @@ What the push worker sends to a browser for a new message. The payload is encryp
 ```json
 {
   "type": "message",
+  "team_id": "t1…",
   "channel_id": "42aa…",
   "message_id": "9f3a…",
   "seq": 108,
@@ -855,7 +856,8 @@ What the push worker sends to a browser for a new message. The payload is encryp
 - `preview`: the first 100 characters of the body; empty for a message with only attachments.
   Mentions stay as `<@user_id>`; the service worker shows a generic text if it can't resolve them.
 - `mentioned`: the user is in the message's `mentions`.
-- The service worker opens `channel_id` on click and loads the message with REST, as after a reconnect.
+- `team_id`: the channel's team, so a click can open `/teams/{team_id}/channels/{channel_id}` in the web
+  app, which loads the message with REST as after a reconnect.
 
 **Who gets one**, for each `message.created` event:
 - a member of the channel who isn't the author and hasn't muted it, and
