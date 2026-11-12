@@ -6,8 +6,9 @@
 ::   2. Run C:\chatty\chatty-infra\setup.bat
 ::
 :: It clones the other repos next to chatty-infra on the dev branch, creates every .env from its
-:: .env.example with matching secrets, creates the JWT key pair once, and can create the Python
-:: virtualenvs and start the stack. Last, it starts Kafka and creates the chat.events topic.
+:: .env.example with matching secrets, creates the JWT and VAPID key pairs once, and can create
+:: the Python virtualenvs and start the stack. Last, it starts Kafka and creates the chat.events
+:: topic.
 :: It never overwrites a .env value you have already set, and never touches a repo with changes.
 ::
 ::   setup.bat            asks at every step
@@ -95,6 +96,7 @@ if exist "%ROOT%\.env" (
 )
 if exist "%CHAT_DIR%\.env" call :set_env "%CHAT_DIR%\.env" chatty-chat CORE_SERVICE_TOKEN !NEW_TOKEN!
 if exist "%CORE_DIR%\.env" call :set_env "%CORE_DIR%\.env" chatty-core SECRET_KEY !NEW_SECRET!
+call :vapid_keys
 
 :: ---- 4. JWT keys ----------------------------------------------------------------------------
 call "%LIB%" :step 4 8 "JWT keys"
@@ -244,6 +246,30 @@ if "!_res!"=="set" (
     call "%LIB%" :warn "%~2\.env: could not set %~3."
     set "WARNINGS=1"
 )
+exit /b 0
+
+:vapid_keys
+:: One VAPID key pair for Web Push (D-13) in chatty-chat\.env, made once: a new pair breaks every
+:: browser subscription. The push worker signs with the private half; chatty-web needs the public one.
+if not exist "%CHAT_DIR%\.env" exit /b 0
+:: A .env made before the push worker has no VAPID lines, and set_env only fills a line that exists.
+for %%k in (VAPID_PRIVATE_KEY VAPID_PUBLIC_KEY) do (
+    findstr /b /c:"%%k=" "%CHAT_DIR%\.env" >nul || (echo.& echo %%k=)>>"%CHAT_DIR%\.env"
+)
+set "_priv="
+set "_pub="
+for /f "tokens=1,2" %%a in ('powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\scripts\vapid-keys.ps1"') do (
+    set "_priv=%%a"
+    set "_pub=%%b"
+)
+if not defined _pub (
+    call "%LIB%" :warn "chatty-chat\.env: could not create the VAPID keys. The push worker won't start."
+    set "WARNINGS=1"
+    exit /b 0
+)
+call :set_env "%CHAT_DIR%\.env" chatty-chat VAPID_PRIVATE_KEY !_priv!
+:: The public half only goes with its own private half, so a kept private key keeps its public key.
+if "!_res!"=="set" call :set_env "%CHAT_DIR%\.env" chatty-chat VAPID_PUBLIC_KEY !_pub!
 exit /b 0
 
 :jwt_keys
