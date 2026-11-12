@@ -31,7 +31,7 @@ set "COMPOSE_FILE=%ROOT%\docker-compose.yml"
 
 :: The one list of services. Start order; container names are chatty-<service>.
 set "INFRA_SERVICES=core-db chat-db redis minio kafka"
-set "APP_SERVICES=core chat relay"
+set "APP_SERVICES=core chat relay push-worker"
 set "ALL_SERVICES=%APP_SERVICES% %INFRA_SERVICES%"
 
 :: Colors (Windows 10+). Set NO_COLOR=1 to turn them off.
@@ -281,6 +281,10 @@ if "%~1"=="relay" (
     set "SVC_ADDR=-"
     set "SVC_DESC=outbox relay: channel_events to Kafka"
 )
+if "%~1"=="push-worker" (
+    set "SVC_ADDR=-"
+    set "SVC_DESC=push worker: Kafka to Web Push"
+)
 if "%~1"=="core-db" (
     set "SVC_ADDR=127.0.0.1:%CFG_CORE_DB_PORT%"
     set "SVC_DESC=Postgres, %CFG_CORE_DB_NAME%"
@@ -325,7 +329,7 @@ if "!STATE!"=="exited" set "_color=%C_RED%"
 if "!STATE!"=="restarting" set "_color=%C_YELLOW%"
 set "_label=!_label!              "
 set "_addr=!SVC_ADDR!                          "
-echo     %C_BOLD%!_name:~0,9!%C_RESET% !_color!!_label:~0,12!%C_RESET% !_addr:~0,26! %C_DIM%!SVC_DESC!%C_RESET%
+echo     %C_BOLD%!_name:~0,12!%C_RESET% !_color!!_label:~0,12!%C_RESET% !_addr:~0,26! %C_DIM%!SVC_DESC!%C_RESET%
 exit /b 0
 
 :status_table

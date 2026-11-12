@@ -217,6 +217,40 @@ services:
       kafka:
         condition: service_healthy
 
+  # Push worker (CHAT-220), same image as chat: Kafka group push-worker, sends Web Push for new
+  # messages (api-chat.md#push-payload). More than one may run, at most one per partition.
+  # No --reload: after a code change, restart.bat push-worker.
+  push-worker:
+    build: ../chatty-chat
+    image: chatty-chat:dev
+    container_name: chatty-push-worker
+    command: python -m app.jobs.push_worker
+    env_file:
+      - path: ../chatty-chat/.env
+        required: false
+    environment:
+      # Service names and ports inside the network; these win over chatty-chat/.env.
+      # VAPID_PRIVATE_KEY (made by setup.bat) and VAPID_SUBJECT come from chatty-chat/.env.
+      DATABASE_URL: postgresql+asyncpg://${CHAT_DB_USER:-chat_user}:${CHAT_DB_PASSWORD:-chat_pass}@chat-db:5432/${CHAT_DB_NAME:-chat_db}
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      CORE_INTERNAL_URL: http://chatty-core:8000
+      CORE_SERVICE_TOKEN: ${CORE_SERVICE_TOKEN:-change-me}
+    volumes:
+      - ../chatty-chat:/app
+    # The image's health check calls /health on port 8001, which only the API serves.
+    healthcheck:
+      disable: true
+    # Exits without VAPID_PRIVATE_KEY, or when Kafka can't be reached at startup; Docker starts it again.
+    restart: unless-stopped
+    depends_on:
+      chat:
+        condition: service_healthy  # chat's start applies the migrations, push_subscriptions included
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   core-db-data:
   chat-db-data:
