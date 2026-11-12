@@ -365,6 +365,46 @@ if errorlevel 1 (
 call :ok "Kafka topic chat.events is ready: 6 partitions, kept 7 days."
 exit /b 0
 
+:create_minio_bucket
+:: create_minio_bucket -> starts MinIO if needed and creates the bucket chatty, its lifecycle rule and
+:: a user per service (D-14). errorlevel 1 on failure. Safe to run again: each command replaces what
+:: is there, and user add sets the secret from .env again. mc runs inside the minio container, so the
+:: JSON files in minio\ go in through stdin.
+call :check_docker || (
+    call :warn "Skipped the MinIO bucket: Docker is not available."
+    exit /b 1
+)
+if exist "%ROOT%\.env" call :load_env "%ROOT%\.env"
+call :info "Starting MinIO if needed, up to 3 minutes ..."
+call :compose_up "minio"
+if errorlevel 1 (
+    call :warn "MinIO did not start, so the bucket was not created."
+    call :hint "See: logs.bat minio"
+    exit /b 1
+)
+docker exec chatty-minio mc mb --ignore-existing local/chatty >nul || goto :minio_failed
+docker exec chatty-minio mc anonymous set none local/chatty >nul || goto :minio_failed
+docker exec -i chatty-minio mc ilm import local/chatty < "%ROOT%\minio\lifecycle.json" >nul || goto :minio_failed
+call :minio_user chatty-core "!CFG_CORE_MINIO_ACCESS_KEY!" "!CFG_CORE_MINIO_SECRET_KEY!" || goto :minio_failed
+call :minio_user chatty-chat "!CFG_CHAT_MINIO_ACCESS_KEY!" "!CFG_CHAT_MINIO_SECRET_KEY!" || goto :minio_failed
+call :ok "MinIO bucket chatty is ready: private, uploads/ expire after 1 day, a user for core and chat."
+exit /b 0
+
+:minio_failed
+call :warn "Could not set up the MinIO bucket chatty."
+call :hint "See: logs.bat minio"
+exit /b 1
+
+:minio_user
+:: minio_user <policy> <access key> <secret> -> creates the policy from minio\<policy>.json and the
+:: user, and attaches the policy to the user
+if "%~2"=="" exit /b 1
+if "%~3"=="" exit /b 1
+docker exec -i chatty-minio mc admin policy create local %~1 /dev/stdin < "%ROOT%\minio\%~1.json" >nul || exit /b 1
+docker exec chatty-minio mc admin user add local %~2 %~3 >nul || exit /b 1
+docker exec chatty-minio mc admin policy attach local %~1 --user %~2 >nul || exit /b 1
+exit /b 0
+
 :ensure_running
 :: ensure_running <service> -> starts it after asking (or right away when INTERACTIVE=0)
 call :is_running %~1 && exit /b 0
