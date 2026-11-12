@@ -56,6 +56,7 @@ everything else: status, new migrations, checks and rollbacks. Set `NO_COLOR=1` 
 | `core` | <http://127.0.0.1:8000> | chatty-core API, `/health` |
 | `chat` | <http://127.0.0.1:8001> | chatty-chat API, `/health` |
 | `relay` | – | Outbox relay: sends `channel_events` to Kafka. No port; `logs.bat relay` |
+| `push-worker` | – | Push worker: sends Web Push for new messages. No port; `logs.bat push-worker`. Needs `VAPID_PRIVATE_KEY` in `chatty-chat/.env` (setup.bat makes it) |
 | `core-db` | `127.0.0.1:5432` | Postgres, `core_db` |
 | `chat-db` | `127.0.0.1:5433` | Postgres, `chat_db` |
 | `redis` | `127.0.0.1:6379` | Redis |

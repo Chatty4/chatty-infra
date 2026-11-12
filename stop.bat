@@ -3,7 +3,7 @@
 ::
 ::   stop.bat                     menu
 ::   stop.bat all                 stop every container, keep them for a fast start
-::   stop.bat apps                stop chatty-core, chatty-chat and the relay, keep infra running
+::   stop.bat apps                stop chatty-core, chatty-chat, relay and push worker, keep infra running
 ::   stop.bat down                remove the containers and network, keep the data
 ::   stop.bat core redis ...      stop chosen services
 setlocal EnableDelayedExpansion
@@ -23,7 +23,7 @@ if "%INTERACTIVE%"=="0" goto :run
 echo   What do you want to stop?
 echo.
 call "%LIB%" :menu_item 1 "Everything" "containers are kept, start.bat brings them back in seconds"
-call "%LIB%" :menu_item 2 "Apps only" "chatty-core, chatty-chat and the relay, infra keeps running"
+call "%LIB%" :menu_item 2 "Apps only" "chatty-core, chatty-chat, relay and push worker, infra keeps running"
 call "%LIB%" :menu_item 3 "Pick services" "choose one or more"
 call "%LIB%" :menu_item 4 "Remove containers" "docker compose down. Data in volumes is kept"
 call "%LIB%" :menu_item Q "Quit"
