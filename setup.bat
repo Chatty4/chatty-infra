@@ -8,12 +8,12 @@
 :: It clones the other repos next to chatty-infra on the dev branch, creates every .env from its
 :: .env.example with matching secrets, creates the JWT and VAPID key pairs once, and can create
 :: the Python virtualenvs and start the stack. Last, it starts Kafka and creates the chat.events
-:: topic.
+:: topic, then starts MinIO and creates the bucket chatty with a user for core and chat.
 :: It never overwrites a .env value you have already set, and never touches a repo with changes.
 ::
 ::   setup.bat            asks at every step
-::   setup.bat --yes      clone what's missing, create the .env files and the Kafka topic, no
-::                        questions; skips pulls, virtualenvs and starting the stack
+::   setup.bat --yes      clone what's missing, create the .env files, the Kafka topic and the MinIO
+::                        bucket, no questions; skips pulls, virtualenvs and starting the stack
 setlocal EnableDelayedExpansion
 call "%~dp0scripts\lib.bat" :init || exit /b 1
 call "%LIB%" :title "Chatty - Setup"
@@ -41,7 +41,7 @@ echo   Clone from: %C_BOLD%!REMOTE_BASE!%C_RESET%   branch: %C_BOLD%%BRANCH%%C_R
 echo.
 
 :: ---- 1. Tools -------------------------------------------------------------------------------
-call "%LIB%" :step 1 8 "Checking tools"
+call "%LIB%" :step 1 9 "Checking tools"
 where git >nul 2>&1
 if errorlevel 1 (
     call "%LIB%" :err "git is not installed. Get it from https://git-scm.com/download/win"
@@ -72,11 +72,11 @@ if errorlevel 1 (
 )
 
 :: ---- 2. Repos -------------------------------------------------------------------------------
-call "%LIB%" :step 2 8 "Cloning the repos"
+call "%LIB%" :step 2 9 "Cloning the repos"
 for %%r in (%REPOS%) do call :repo %%r
 
 :: ---- 3. .env files --------------------------------------------------------------------------
-call "%LIB%" :step 3 8 "Creating .env files"
+call "%LIB%" :step 3 9 "Creating .env files"
 call :env_file "%ROOT%" chatty-infra
 call :env_file "%CORE_DIR%" chatty-core
 call :env_file "%CHAT_DIR%" chatty-chat
@@ -97,13 +97,14 @@ if exist "%ROOT%\.env" (
 if exist "%CHAT_DIR%\.env" call :set_env "%CHAT_DIR%\.env" chatty-chat CORE_SERVICE_TOKEN !NEW_TOKEN!
 if exist "%CORE_DIR%\.env" call :set_env "%CORE_DIR%\.env" chatty-core SECRET_KEY !NEW_SECRET!
 call :vapid_keys
+call :minio_secrets
 
 :: ---- 4. JWT keys ----------------------------------------------------------------------------
-call "%LIB%" :step 4 8 "JWT keys"
+call "%LIB%" :step 4 9 "JWT keys"
 call :jwt_keys
 
 :: ---- 5. VS Code workspace -------------------------------------------------------------------
-call "%LIB%" :step 5 8 "VS Code workspace"
+call "%LIB%" :step 5 9 "VS Code workspace"
 set "WS_FILE=%WORKSPACE%\chatty.code-workspace"
 if exist "%WS_FILE%" (
     call "%LIB%" :ok "chatty.code-workspace already exists."
@@ -125,7 +126,7 @@ if exist "%WS_FILE%" (
 )
 
 :: ---- 6. Virtualenvs and packages ------------------------------------------------------------
-call "%LIB%" :step 6 8 "Local virtualenvs and packages"
+call "%LIB%" :step 6 9 "Local virtualenvs and packages"
 if "%INTERACTIVE%"=="0" (
     call "%LIB%" :info "Skipped with --yes. Run setup.bat again without it to create them."
 ) else (
@@ -136,7 +137,7 @@ if "%INTERACTIVE%"=="0" (
 )
 
 :: ---- 7. Start -------------------------------------------------------------------------------
-call "%LIB%" :step 7 8 "Start the stack"
+call "%LIB%" :step 7 9 "Start the stack"
 if "%INTERACTIVE%"=="0" (
     call "%LIB%" :info "Skipped with --yes. Run start.bat when you're ready."
 ) else (
@@ -154,8 +155,13 @@ if "%INTERACTIVE%"=="0" (
 
 :: ---- 8. Kafka topic -------------------------------------------------------------------------
 :: Runs even when step 7 was skipped: it starts Kafka on its own, so the topic always exists.
-call "%LIB%" :step 8 8 "Kafka topic"
+call "%LIB%" :step 8 9 "Kafka topic"
 call "%LIB%" :create_kafka_topic || set "WARNINGS=1"
+
+:: ---- 9. MinIO bucket ------------------------------------------------------------------------
+:: Like the topic: it starts MinIO on its own, so the bucket and the service users always exist.
+call "%LIB%" :step 9 9 "MinIO bucket"
+call "%LIB%" :create_minio_bucket || set "WARNINGS=1"
 
 echo.
 if "!WARNINGS!"=="1" (
@@ -270,6 +276,20 @@ if not defined _pub (
 call :set_env "%CHAT_DIR%\.env" chatty-chat VAPID_PRIVATE_KEY !_priv!
 :: The public half only goes with its own private half, so a kept private key keeps its public key.
 if "!_res!"=="set" call :set_env "%CHAT_DIR%\.env" chatty-chat VAPID_PUBLIC_KEY !_pub!
+exit /b 0
+
+:minio_secrets
+:: A random secret for each service's MinIO user, in chatty-infra\.env (D-14). Kept once set: the
+:: MinIO step sets the user's secret from .env every time it runs, so the two always match.
+if not exist "%ROOT%\.env" exit /b 0
+:: A .env made before files has no MinIO lines, and set_env only fills a line that exists. The access
+:: keys need no line: .env.example and docker-compose.yml both default to chatty-core and chatty-chat.
+for %%k in (CORE_MINIO_SECRET_KEY CHAT_MINIO_SECRET_KEY) do (
+    findstr /b /c:"%%k=" "%ROOT%\.env" >nul || (echo.& echo %%k=)>>"%ROOT%\.env"
+    call :random_hex 24
+    call :set_env "%ROOT%\.env" chatty-infra %%k !HEX!
+)
+call "%LIB%" :load_env "%ROOT%\.env"
 exit /b 0
 
 :jwt_keys

@@ -92,9 +92,10 @@ if "!CONFIRMED!"=="1" (
     set "CHATTY_NO_PAUSE=1"
     call "%ROOT%\start.bat" all
     call "%LIB%" :create_kafka_topic
+    call "%LIB%" :create_minio_bucket
     call :offer_migrate
 ) else (
-    call "%LIB%" :hint "The Kafka topic was deleted too. setup.bat creates it again."
+    call "%LIB%" :hint "The Kafka topic and the MinIO bucket were deleted too. setup.bat creates them again."
 )
 goto :done
 
