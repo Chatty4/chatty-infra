@@ -82,6 +82,9 @@ creates it from the files in `minio/`, and it is safe to run again:
 
 - Each service uses its own user, never the root user. `setup.bat` puts a random secret for each in
   `.env` (`CORE_MINIO_SECRET_KEY`, `CHAT_MINIO_SECRET_KEY`) and sets it in MinIO every time it runs.
+- For runs outside Docker, `setup.bat` also copies each secret to `MINIO_SECRET_KEY` in
+  `chatty-core/.env` and `chatty-chat/.env`, overwriting it every time: `chatty-infra/.env` is the
+  source, so the copies can't drift from MinIO.
 - The bucket name `chatty` is fixed: it is also in the policy files.
 - Services sign URLs with `MINIO_PUBLIC_URL` (`http://127.0.0.1:9000`), the address the browser
   reaches; chatty-core's own calls use `MINIO_INTERNAL_URL` (`http://minio:9000`) (D-16).

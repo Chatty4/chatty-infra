@@ -290,6 +290,28 @@ for %%k in (CORE_MINIO_SECRET_KEY CHAT_MINIO_SECRET_KEY) do (
     call :set_env "%ROOT%\.env" chatty-infra %%k !HEX!
 )
 call "%LIB%" :load_env "%ROOT%\.env"
+:: Core and chat run outside Docker too (local uvicorn and pytest), and then read MINIO_SECRET_KEY from
+:: their own .env. chatty-infra\.env is the source, because the MinIO step sets the users from it, so
+:: the copies are overwritten every time and can't drift.
+call :copy_minio_secret "%CORE_DIR%" chatty-core "!CFG_CORE_MINIO_SECRET_KEY!"
+call :copy_minio_secret "%CHAT_DIR%" chatty-chat "!CFG_CHAT_MINIO_SECRET_KEY!"
+exit /b 0
+
+:copy_minio_secret
+:: copy_minio_secret <repo dir> <repo name> <secret>: MINIO_SECRET_KEY=<secret> in that repo's .env
+if not exist "%~1\.env" exit /b 0
+if "%~3"=="" exit /b 0
+findstr /b /c:"MINIO_SECRET_KEY=" "%~1\.env" >nul || (echo.& echo MINIO_SECRET_KEY=)>>"%~1\.env"
+set "_res="
+for /f %%r in ('powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\scripts\set-env-value.ps1" -Path "%~1\.env" -Key MINIO_SECRET_KEY -Value %~3 -Force') do set "_res=%%r"
+if "!_res!"=="set" (
+    call "%LIB%" :ok "%~2\.env: MINIO_SECRET_KEY copied from chatty-infra\.env."
+) else if "!_res!"=="kept" (
+    call "%LIB%" :ok "%~2\.env: MINIO_SECRET_KEY already matches chatty-infra\.env."
+) else (
+    call "%LIB%" :warn "%~2\.env: could not copy MINIO_SECRET_KEY."
+    set "WARNINGS=1"
+)
 exit /b 0
 
 :jwt_keys
