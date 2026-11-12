@@ -145,3 +145,75 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
 - **Rejected:** subscriptions in chatty-core with two internal endpoints for the push worker (two more
   endpoints and an HTTP call per message, for no gain); an endpoint for the VAPID public key.
 - **Plan impact:** replaces the push sections of `api-core.md` and `api-internal.md`.
+
+## D-14: One MinIO bucket, separated by prefix
+- **Status:** accepted
+- **Decision:**
+  - One private bucket, `chatty`. Files are separated by key prefix: `uploads/`, `avatars/`,
+    `team-icons/`, `attachments/`. These are prefixes, not buckets.
+  - Two service accounts: chatty-core reads and writes `chatty/*`; chatty-chat can only
+    `s3:GetObject` on `chatty/attachments/*` (D-02).
+  - `setup.bat` creates the bucket, the accounts, CORS (browser `PUT` from the web app's origin) and a
+    lifecycle rule that deletes `uploads/*` after 1 day. The services never create buckets.
+- **Why:** who can see a file is checked by the service before it signs a URL, not by the bucket.
+  Prefixes still give per-prefix policies and lifecycle rules.
+- **Rejected:** a bucket per team, channel or user (bucket counts are limited, names are global on
+  AWS, and creating buckets at runtime needs admin rights).
+- **Plan impact:** CHAT-120 (setup.bat, +2–3 h). The `upload_url` example in `api-core.md` changes
+  with D-15.
+
+## D-15: Upload to a temporary key, copy to the final key on confirm
+- **Status:** accepted
+- **Decision:**
+  - `POST /files` returns a presigned PUT for `uploads/{file_id}`, with `Content-Type` and
+    `Content-Length` in the signature (and in `upload_headers`), so MinIO rejects a different type or
+    size.
+  - `confirm` first copies the object to its final key (`avatars/…`, `team-icons/…`,
+    `attachments/…`), then checks the copy (size, type, first bytes), then deletes the temporary
+    one. If the check fails, it deletes both. Checking the copy, not the temporary object, matters:
+    the upload URL still works during `confirm`, so a file checked in `uploads/` could be replaced
+    before it is copied. No URL can write to the final key.
+  - The type check reads the first bytes of the file. Avatars and team icons must really be one of
+    the four image types, or the request fails with `upload_mismatch`. For attachments, which can be
+    any type, `upload_mismatch` compares only the `Content-Type` header: real files often don't match
+    what the browser says (`.docx` → `application/zip`).
+- **Why:** a presigned URL can't be revoked. If it pointed at the final key, the owner could replace
+  a checked file with any other file until the URL expires. A late `PUT` now only reaches
+  `uploads/`, which nothing reads.
+- **Rejected:** a shorter expiry only (smaller window, still open); storing the ETag at confirm and
+  checking it on download.
+- **Plan impact:** CHAT-120, no change in days. `api-core.md`: the `upload_url` example and the
+  `upload_mismatch` row. `object_key` returned by `attach` is always the final key, so chatty-chat
+  is not affected.
+
+## D-16: Presigned URLs are signed for the public MinIO address
+- **Status:** accepted
+- **Decision:**
+  - Both services sign URLs with an S3 client configured with `MINIO_PUBLIC_URL` (the address the
+    browser uses: `http://127.0.0.1:9000` locally). chatty-core makes its other MinIO calls with a
+    second client on `MINIO_INTERNAL_URL` (`http://minio:9000` in Docker).
+  - Both use boto3 (`signature_version="s3v4"`, path-style addressing, region `us-east-1`).
+  - chatty-chat signs attachment downloads with
+    `Content-Disposition: attachment; filename*=UTF-8''…`, so an uploaded HTML or SVG file is
+    downloaded, never opened as a page. Avatars and team icons, which passed the image check, are
+    signed `inline`.
+  - Presigned URLs are never logged.
+- **Why:** the host is part of the signature, so a URL signed for `minio:9000` fails in the browser.
+  Attachments can be any type, and opening one inline would let it run scripts.
+- **Plan impact:** none in days (CHAT-120, CHAT-213). New setting `MINIO_PUBLIC_URL` in both services'
+  `.env.example` and in `docker-compose.yml`.
+
+## D-17: Cleaning up files that are never used
+- **Status:** accepted
+- **Decision:** chatty-core's cleanup job (every hour, as in the File upload diagram on the
+  chatty-core Confluence page) also deletes:
+  - attachments that are `ready` but still not attached to a message 24 hours after upload;
+  - avatars and team icons that were replaced and are no longer used.
+
+  An unattached attachment is marked deleted under the same row lock that `attach` takes, so a
+  message sent at that moment either attaches it first (the job skips it) or gets `file_not_found`.
+- **Why:** without this, a confirmed attachment that never goes into a message stays in MinIO
+  forever: it isn't `pending` and has no `deleted_at`. The web app must not keep a file ID longer
+  than 24 hours before sending.
+- **Plan impact:** CHAT-120 (+1–2 h in the cleanup job). `api-core.md` (upload flow) and the
+  chatty-core Confluence page (section 2, cleanup job) say so.

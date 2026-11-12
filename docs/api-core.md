@@ -409,6 +409,7 @@ Edit my profile. `PUT` replaces all editable fields, so send all of them.
 - `display_name`: 1–60 chars
 - `timezone`: an IANA name, for example `Europe/Bucharest`
 - `avatar_file_id`: `null` removes the avatar. Otherwise a `ready` file with purpose `avatar`, uploaded by me
+- The avatar it replaces is deleted by the cleanup job (D-17)
 
 **Response 200**: the same body as [GET /me](#get-me)
 
@@ -530,6 +531,7 @@ Edit the team's name and icon.
 }
 ```
 - `icon_file_id`: `null` removes the icon. Otherwise a `ready` file with purpose `team_icon` and this `team_id`
+- The icon it replaces is deleted by the cleanup job (D-17)
 
 **Response 200**: the same body as [GET /teams/{team_id}](#get-teams-team_id)
 
@@ -792,7 +794,7 @@ The invite page: which team and whether the link still works. Shown before login
   "reason": null,
   "team": {
     "name": "Backend",
-    "icon_url": "https://minio…/team-icons/t1…/f9…?X-Amz-Signature=…",
+    "icon_url": "https://minio…/chatty/team-icons/t1…/f9…?X-Amz-Signature=…",
     "member_count": 12
   },
   "expires_at": "2026-10-13T12:00:00Z"
@@ -1271,6 +1273,10 @@ My settings for a channel. Publishes `membership.changed` (`settings`), so chatt
 
 Uploads take 3 steps: [POST /files](#post-files) → [PUT to the upload URL](#put-presigned-upload-url) → [POST /files/{file_id}/confirm](#post-files-file_id-confirm). Only `ready` files can be used.
 
+- All files are in one MinIO bucket, `chatty` (D-14). The upload goes to a temporary key, `uploads/{file_id}`; `confirm` moves it to its final key (D-15): `avatars/{user_id}/{file_id}`, `team-icons/{team_id}/{file_id}` or `attachments/{team_id}/{file_id}`.
+- An attachment that is not in a message 24 hours after its upload is deleted, so send it within that time (D-17).
+- Presigned URLs are signed for the public MinIO address (D-16).
+
 <a id="post-files"></a>
 ## POST /files
 Step 1: ask for an upload. Creates a `pending` file and returns a presigned MinIO upload URL.
@@ -1299,21 +1305,24 @@ Step 1: ask for an upload. Creates a `pending` file and returns a presigned MinI
 ```json
 {
   "file_id": "f6…",
-  "upload_url": "https://minio…/attachments/t1…/f6…?X-Amz-Signature=…",
+  "upload_url": "https://minio…/chatty/uploads/f6…?X-Amz-Signature=…",
   "upload_method": "PUT",
-  "upload_headers": { "Content-Type": "application/pdf" },
+  "upload_headers": { "Content-Type": "application/pdf", "Content-Length": "482133" },
   "expires_at": "2026-10-06T12:10:00Z"
 }
 ```
 - The URL is valid 10 minutes (`upload_expires_at`)
+- `Content-Type` and `Content-Length` are part of the signature: the upload must have exactly the `mime` and `size` sent here
+- `filename` is cleaned before it is saved: path separators (`/`, `\`), control characters and right-to-left override characters are removed
 
 **Errors**
 | Status | code | When |
 |---|---|---|
-| 400 | `validation_error` | unknown purpose, missing or extra `team_id`, bad filename |
+| 400 | `validation_error` | unknown purpose, missing or extra `team_id`, bad filename (also empty after cleaning) |
 | 400 | `file_too_large` | over 2 MB for images, over 25 MB for attachments |
 | 400 | `type_not_allowed` | not an image for `avatar` or `team_icon` |
 | 403 | `not_a_team_member` | I am not in `team_id` |
+| 429 | `rate_limited` | more than 30 uploads started per minute, or 20 uploads already started and not confirmed. `Retry-After` says when to try again |
 
 ---
 
@@ -1329,13 +1338,20 @@ Step 2: the browser uploads the file straight to MinIO. This request does not go
 
 **Response 200** from MinIO (no body)
 
-**Errors**: MinIO returns `403` if the URL expired or the headers don't match.
+**Errors**: MinIO returns `403` if the URL expired or the headers don't match (another type or size than in step 1).
+
+The URL writes only to the temporary key `uploads/{file_id}`. A `PUT` after `confirm` changes nothing: the confirmed file is already at its final key (D-15).
 
 ---
 
 <a id="post-files-file_id-confirm"></a>
 ## POST /files/{file_id}/confirm
 Step 3: check the uploaded file in MinIO and mark it `ready`. If the object is missing, or its size or type doesn't match step 1, chatty-core deletes it and returns an error.
+
+How it works (D-15): chatty-core copies `uploads/{file_id}` to the final key, checks the copy, then deletes the temporary object. It checks the copy, not the temporary object, because the upload URL still works while `confirm` runs.
+- Size: must be the `size` from step 1.
+- `avatar` and `team_icon`: the first bytes of the file must really be one of the four image types, and the image must open.
+- `attachment`: the `Content-Type` of the upload must be the `mime` from step 1. The bytes are not compared with it, because many real files don't match what the browser says (a `.docx` is a zip file).
 
 **Auth:** `Authorization: Bearer <JWT>`
 
@@ -1361,7 +1377,7 @@ Step 3: check the uploaded file in MinIO and mark it `ready`. If the object is m
 | Status | code | When |
 |---|---|---|
 | 400 | `upload_missing` | nothing was uploaded to MinIO |
-| 400 | `upload_mismatch` | the size or type is different from step 1; the object was deleted |
+| 400 | `upload_mismatch` | the size or type is different from step 1, or an avatar or team icon is not really an image; the object was deleted |
 | 403 | `forbidden` | the file is not mine |
 | 404 | `file_not_found` | the file doesn't exist |
 | 410 | `upload_expired` | the 10 minutes passed; start again with step 1 |
