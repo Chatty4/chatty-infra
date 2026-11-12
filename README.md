@@ -14,8 +14,9 @@ You need Git, Docker Desktop and, for local virtualenvs, Python 3.14.
 2. Run `setup.bat`. It clones the other repos next to this one on `dev`, creates every `.env` from its
    `.env.example` with matching secrets, creates the JWT key pair in `chatty-core/keys` once (new keys
    would log everyone out), creates `chatty.code-workspace`, can set up the virtualenvs and start the
-   stack, and last creates the Kafka topic `chat.events` (it starts Kafka for that). It is safe to run
-   again: it never overwrites a value you set and never touches a repo with uncommitted changes.
+   stack, and last creates the Kafka topic `chat.events` and the MinIO bucket `chatty` (it starts Kafka
+   and MinIO for that). It is safe to run again: it never overwrites a value you set and never touches
+   a repo with uncommitted changes.
 
 ```text
 C:\chatty\
@@ -34,7 +35,7 @@ asks, and with arguments it runs without questions (see the top of each file).
 
 | Script | What it does | Without questions |
 |---|---|---|
-| `setup.bat` | Clone the repos, create `.env` files, virtualenvs, the Kafka topic | `setup.bat --yes` |
+| `setup.bat` | Clone the repos, create `.env` files, virtualenvs, the Kafka topic, the MinIO bucket | `setup.bat --yes` |
 | `start.bat` | Start everything, infra only, or chosen services; waits for health checks | `start.bat all`, `start.bat infra`, `start.bat apps --build` |
 | `stop.bat` | Stop containers, or remove them; data is always kept | `stop.bat all`, `stop.bat apps`, `stop.bat down` |
 | `restart.bat` | Restart, recreate (compose or `.env` changes) or rebuild (`requirements.txt` changes) | `restart.bat core`, `restart.bat chat --build` |
@@ -43,7 +44,7 @@ asks, and with arguments it runs without questions (see the top of each file).
 | `status.bat` | Containers, app health and the branch of every repo; can refresh every 5 seconds | `status.bat --once` |
 | `test.bat` | The CI checks inside the containers: ruff, pre-test checks, pytest; or fix lint | `test.bat all`, `test.bat chat tests` |
 | `shell.bat` | Django shell, bash, psql, redis-cli, MinIO console | `shell.bat psql-core`, `shell.bat redis` |
-| `reset-db.bat` | Wipe `core_db`, `chat_db` or every volume; backs up to `backups\` first. Every volume also deletes the Kafka topic: it is created again if you start again, otherwise run `setup.bat` | always asks |
+| `reset-db.bat` | Wipe `core_db`, `chat_db` or every volume; backs up to `backups\` first. Every volume also deletes the Kafka topic and the MinIO bucket: they are created again if you start again, otherwise run `setup.bat` | always asks |
 
 The core and chat containers apply pending migrations every time they start, so `migrate.bat` is for
 everything else: status, new migrations, checks and rollbacks. Set `NO_COLOR=1` to turn off colors.
@@ -65,6 +66,27 @@ Ports come from `.env.example`; override them in `.env`. Use `127.0.0.1`, not `l
 publishes the ports on IPv4 only, and Windows tries `localhost` as IPv6 first.
 
 Without the scripts, the same with plain compose: `docker compose up -d --wait`, `docker compose stop`.
+
+## MinIO
+
+All files are in one private bucket, `chatty`, separated by prefix (D-14 in `docs/decisions.md`):
+`uploads/` (temporary, until `confirm`), `avatars/`, `team-icons/`, `attachments/`. `setup.bat`
+creates it from the files in `minio/`, and it is safe to run again:
+
+| File | What it sets |
+|---|---|
+| `minio/lifecycle.json` | objects in `uploads/` are deleted after 1 day |
+| `minio/chatty-core.json` | policy of the `chatty-core` user: list the bucket, read, write and delete files |
+| `minio/chatty-chat.json` | policy of the `chatty-chat` user: read `attachments/` only (D-02) |
+
+- Each service uses its own user, never the root user. `setup.bat` puts a random secret for each in
+  `.env` (`CORE_MINIO_SECRET_KEY`, `CHAT_MINIO_SECRET_KEY`) and sets it in MinIO every time it runs.
+- The bucket name `chatty` is fixed: it is also in the policy files.
+- Services sign URLs with `MINIO_PUBLIC_URL` (`http://127.0.0.1:9000`), the address the browser
+  reaches; chatty-core's own calls use `MINIO_INTERNAL_URL` (`http://minio:9000`) (D-16).
+- CORS: MinIO allows every origin by default, so browser uploads from the web app work locally.
+  Production sets `MINIO_API_CORS_ALLOW_ORIGIN` to the web app's origin.
+- Changed a file in `minio/`? Run `setup.bat --yes` again.
 
 ## Contracts
 
