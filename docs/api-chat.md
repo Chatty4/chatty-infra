@@ -790,7 +790,7 @@ notifications, and again on every app start, because browsers sometimes change t
   "auth": "k8J…"
 }
 ```
-- `endpoint`: an `https://` URL, at most 2048 characters
+- `endpoint`: an `https://` URL on a known push service (`fcm.googleapis.com`, `updates.push.services.mozilla.com`, `web.push.apple.com`, `*notify.windows.com` ), at most 2048 characters
 - `p256dh`: base64url, 65 bytes once decoded
 - `auth`: base64url, 16 bytes once decoded
 
@@ -802,7 +802,7 @@ notifications, and again on every app start, because browsers sometimes change t
 **Errors**
 | Status | code | When |
 |---|---|---|
-| 400 | `validation_error` | `endpoint` is not an `https` URL or is too long, or a key is missing or not valid base64url |
+| 400 | `validation_error` | `endpoint` is not an `https` URL or is not on a known push service or is too long, or a key is missing or not valid base64url |
 
 ---
 
