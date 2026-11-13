@@ -15,7 +15,9 @@
     { "key": "dm_id", "value": "" },
     { "key": "me_id", "value": "" },
     { "key": "client_msg_id", "value": "" },
-    { "key": "message_id", "value": "" }
+    { "key": "message_id", "value": "" },
+    { "key": "file_id", "value": "" },
+    { "key": "upload_url", "value": "" }
   ],
   "item": [
     {
@@ -762,6 +764,54 @@
       ]
     },
     {
+      "name": "Files",
+      "item": [
+        {
+          "name": "POST /files",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var body = pm.response.json();",
+                  "if (body.file_id) pm.collectionVariables.set('file_id', body.file_id);",
+                  "if (body.upload_url) pm.collectionVariables.set('upload_url', body.upload_url);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{core_url}}/api/core/v1/files",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"purpose\": \"avatar\",\n  \"team_id\": null,\n  \"filename\": \"me.png\",\n  \"mime\": \"image/png\",\n  \"size\": 5\n}"
+            },
+            "description": "Step 1 of an upload. For team_icon or attachment, set team_id to \"{{team_id}}\". Saves file_id and upload_url for the next request."
+          }
+        },
+        {
+          "name": "PUT upload URL (MinIO, no auth)",
+          "request": {
+            "method": "PUT",
+            "url": "{{upload_url}}",
+            "header": [
+              { "key": "Content-Type", "value": "image/png" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "hello"
+            },
+            "description": "Step 2: straight to MinIO. Content-Type and the body's length (5 bytes) must match mime and size from POST /files, or MinIO answers 403. Postman sets Content-Length itself."
+          }
+        }
+      ]
+    },
+    {
       "name": "Messages (chatty-chat)",
       "item": [
         {
@@ -1010,6 +1060,85 @@
             "header": [
               { "key": "Authorization", "value": "Bearer {{access_token}}" }
             ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Read state (chatty-chat)",
+      "item": [
+        {
+          "name": "POST /channels/:channel_id/read",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{chat_url}}/api/chat/v1/channels/:channel_id/read",
+              "host": ["{{chat_url}}"],
+              "path": ["api", "chat", "v1", "channels", ":channel_id", "read"],
+              "variable": [{ "key": "channel_id", "value": "{{channel_id}}" }]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seq\": 1000000\n}"
+            },
+            "description": "A seq past the channel's last message is lowered to it, so this marks the whole channel read."
+          }
+        },
+        {
+          "name": "GET /unread",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{chat_url}}/api/chat/v1/unread?team_id={{team_id}}",
+              "host": ["{{chat_url}}"],
+              "path": ["api", "chat", "v1", "unread"],
+              "query": [
+                { "key": "team_id", "value": "{{team_id}}", "description": "required" }
+              ]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Push (chatty-chat)",
+      "item": [
+        {
+          "name": "POST /push/subscriptions",
+          "request": {
+            "method": "POST",
+            "url": "{{chat_url}}/api/chat/v1/push/subscriptions",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endpoint\": \"https://push.example.com/postman\",\n  \"p256dh\": \"BAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0-P0A\",\n  \"auth\": \"AAECAwQFBgcICQoLDA0ODw\"\n}"
+            },
+            "description": "Sample keys of the right length (p256dh 65 bytes, auth 16), not a real browser: the push worker's sends to this endpoint fail, and it deletes the subscription."
+          }
+        },
+        {
+          "name": "DELETE /push/subscriptions",
+          "request": {
+            "method": "DELETE",
+            "url": "{{chat_url}}/api/chat/v1/push/subscriptions",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endpoint\": \"https://push.example.com/postman\"\n}"
+            }
           }
         }
       ]
