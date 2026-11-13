@@ -798,6 +798,7 @@ notifications, and again on every app start, because browsers sometimes change t
 - Saved by `endpoint`: a new endpoint is added; a known one gets the new keys.
 - If the endpoint belongs to another user (a shared computer), it moves to the current user, so the
   browser only gets pushes for whoever is logged in.
+- A user keeps at most 10 subscriptions. Saving one more deletes the one saved longest ago.
 
 **Errors**
 | Status | code | When |
