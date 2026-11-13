@@ -789,9 +789,9 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"purpose\": \"avatar\",\n  \"team_id\": null,\n  \"filename\": \"me.png\",\n  \"mime\": \"image/png\",\n  \"size\": 5\n}"
+              "raw": "{\n  \"purpose\": \"attachment\",\n  \"team_id\": \"{{team_id}}\",\n  \"filename\": \"notes.txt\",\n  \"mime\": \"text/plain\",\n  \"size\": 5\n}"
             },
-            "description": "Step 1 of an upload. For team_icon or attachment, set team_id to \"{{team_id}}\". Saves file_id and upload_url for the next request."
+            "description": "Step 1 of an upload: a 5-byte text attachment, which the next two requests upload and confirm. For an avatar, use purpose \"avatar\", team_id null, an image mime and the image's exact size in bytes, then send the image file as a binary body in the PUT (confirm checks that the bytes really are that image). Saves file_id and upload_url."
           }
         },
         {
@@ -800,13 +800,29 @@
             "method": "PUT",
             "url": "{{upload_url}}",
             "header": [
-              { "key": "Content-Type", "value": "image/png" }
+              { "key": "Content-Type", "value": "text/plain" }
             ],
             "body": {
               "mode": "raw",
               "raw": "hello"
             },
             "description": "Step 2: straight to MinIO. Content-Type and the body's length (5 bytes) must match mime and size from POST /files, or MinIO answers 403. Postman sets Content-Length itself."
+          }
+        },
+        {
+          "name": "POST /files/:file_id/confirm",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/files/:file_id/confirm",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "files", ":file_id", "confirm"],
+              "variable": [{ "key": "file_id", "value": "{{file_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "description": "Step 3: chatty-core checks the upload and marks the file ready. Sending it again also gives 200. Before the PUT: upload_missing; after 10 minutes: upload_expired."
           }
         }
       ]

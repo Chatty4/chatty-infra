@@ -176,7 +176,7 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
   - The type check reads the first bytes of the file. Avatars and team icons must really be one of
     the four image types, or the request fails with `upload_mismatch`. For attachments, which can be
     any type, `upload_mismatch` compares only the `Content-Type` header: real files often don't match
-    what the browser says (`.docx` → `application/zip`).
+    what the browser says (`.docx` → `application/zip`). Executables are the exception: D-18.
 - **Why:** a presigned URL can't be revoked. If it pointed at the final key, the owner could replace
   a checked file with any other file until the URL expires. A late `PUT` now only reaches
   `uploads/`, which nothing reads.
@@ -217,3 +217,32 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
   than 24 hours before sending.
 - **Plan impact:** CHAT-120 (+1–2 h in the cleanup job). `api-core.md` (upload flow) and the
   chatty-core Confluence page (section 2, cleanup job) say so.
+
+## D-18: No executables as attachments
+- **Status:** accepted
+- **Decision:**
+  - Attachments can still be any type, except programs and installers. They are refused twice:
+    - **`POST /files`, by name and declared type:** a `filename` ending in `.exe`, `.dll`, `.com`,
+      `.scr`, `.cpl`, `.msi`, `.msp`, `.msix`, `.appx`, `.bat`, `.cmd`, `.ps1`, `.vbs`, `.vbe`,
+      `.wsf`, `.hta`, `.lnk`, `.jar`, `.apk`, `.dmg` or `.pkg` (any case), or a `mime` of one of
+      those types, gets `type_not_allowed`.
+    - **`confirm`, by content:** the first bytes of the copy must not be a Windows program (`MZ`),
+      a Linux program (ELF) or a macOS program (Mach-O), whatever the file is called. Otherwise
+      both objects are deleted and the request fails with `upload_mismatch`.
+  - Avatars and team icons: the format read from the bytes must be the declared `mime`, not just
+    any of the four image types, because MinIO later serves the file with that `Content-Type`.
+    The whole image is decoded (Pillow's `load()`, not `verify()`, which misses a JPEG or GIF that
+    was cut short), and an image over 25 megapixels (5000 × 5000) is refused before decoding, so
+    a small file that claims to be huge can't use up memory.
+  - chatty-core detects formats with Pillow (images) and `filetype` (attachments): pure Python
+    packages, so no system library in the Docker image, in CI or on Windows.
+- **Why:** a chat is an easy way to spread malware: a program renamed to `report.pdf` looks like
+  any other file. The name check tells the user before the upload; the content check catches
+  renamed files. Scripts that are shared as code (`.js`, `.py`, `.sh`) stay allowed: developers
+  send them in chat, and downloads are never opened in the browser (D-16).
+- **Not covered:** a program inside an archive (`.zip`). That needs a virus scanner at confirm
+  (e.g. ClamAV), which is not planned for the MVP.
+- **Rejected:** an allowlist of safe types (every new file type a team uses would need a change);
+  python-magic (needs the libmagic system library in Docker, in CI and on Windows, for formats a
+  blocklist doesn't need).
+- **Plan impact:** CHAT-166 (+0.5 day). `api-core.md`: `POST /files` and `confirm`.
