@@ -219,7 +219,7 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
   chatty-core Confluence page (section 2, cleanup job) say so.
 
 ## D-18: No executables as attachments
-- **Status:** proposed
+- **Status:** accepted
 - **Decision:**
   - Attachments can still be any type, except programs and installers. They are refused twice:
     - **`POST /files`, by name and declared type:** a `filename` ending in `.exe`, `.dll`, `.com`,
@@ -231,6 +231,9 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
       both objects are deleted and the request fails with `upload_mismatch`.
   - Avatars and team icons: the format read from the bytes must be the declared `mime`, not just
     any of the four image types, because MinIO later serves the file with that `Content-Type`.
+    The whole image is decoded (Pillow's `load()`, not `verify()`, which misses a JPEG or GIF that
+    was cut short), and an image over 25 megapixels (5000 × 5000) is refused before decoding, so
+    a small file that claims to be huge can't use up memory.
   - chatty-core detects formats with Pillow (images) and `filetype` (attachments): pure Python
     packages, so no system library in the Docker image, in CI or on Windows.
 - **Why:** a chat is an easy way to spread malware: a program renamed to `report.pdf` looks like

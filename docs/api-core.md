@@ -1351,7 +1351,7 @@ Step 3: check the uploaded file in MinIO and mark it `ready`. If the object is m
 
 How it works (D-15): chatty-core copies `uploads/{file_id}` to the final key, checks the copy, then deletes the temporary object. It checks the copy, not the temporary object, because the upload URL still works while `confirm` runs.
 - Size: must be the `size` from step 1.
-- `avatar` and `team_icon`: the format read from the file's bytes must be the `mime` from step 1 (one of the four image types), and the image must open.
+- `avatar` and `team_icon`: the format read from the file's bytes must be the `mime` from step 1 (one of the four image types), the whole image must decode (a file that was cut short is refused), and it can have at most 25 megapixels (5000 × 5000) (D-18).
 - `attachment`: the `Content-Type` of the upload must be the `mime` from step 1. The bytes are not compared with it, because many real files don't match what the browser says (a `.docx` is a zip file). They must not be a program, though: a Windows (`MZ`), Linux (ELF) or macOS (Mach-O) program is refused whatever it is called (D-18).
 
 **Auth:** `Authorization: Bearer <JWT>`
@@ -1378,7 +1378,7 @@ How it works (D-15): chatty-core copies `uploads/{file_id}` to the final key, ch
 | Status | code | When |
 |---|---|---|
 | 400 | `upload_missing` | nothing was uploaded to MinIO |
-| 400 | `upload_mismatch` | the size or type is different from step 1, an avatar or team icon is not really the declared image type, or an attachment is a program (D-18); the object was deleted |
+| 400 | `upload_mismatch` | the size or type is different from step 1, an avatar or team icon is not really the declared image type, is broken or has more than 25 megapixels, or an attachment is a program (D-18); the objects and the file were deleted, so confirming it again gives `file_not_found` |
 | 403 | `forbidden` | the file is not mine |
 | 404 | `file_not_found` | the file doesn't exist |
 | 410 | `upload_expired` | the 10 minutes passed; start again with step 1 |
