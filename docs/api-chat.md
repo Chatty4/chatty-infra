@@ -790,7 +790,7 @@ notifications, and again on every app start, because browsers sometimes change t
   "auth": "k8J…"
 }
 ```
-- `endpoint`: an `https://` URL, at most 2048 characters
+- `endpoint`: an `https://` URL on a known push service (`fcm.googleapis.com`, `updates.push.services.mozilla.com`, `web.push.apple.com`, `*notify.windows.com` ), at most 2048 characters
 - `p256dh`: base64url, 65 bytes once decoded
 - `auth`: base64url, 16 bytes once decoded
 
@@ -798,11 +798,12 @@ notifications, and again on every app start, because browsers sometimes change t
 - Saved by `endpoint`: a new endpoint is added; a known one gets the new keys.
 - If the endpoint belongs to another user (a shared computer), it moves to the current user, so the
   browser only gets pushes for whoever is logged in.
+- A user keeps at most 10 subscriptions. Saving one more deletes the one saved longest ago.
 
 **Errors**
 | Status | code | When |
 |---|---|---|
-| 400 | `validation_error` | `endpoint` is not an `https` URL or is too long, or a key is missing or not valid base64url |
+| 400 | `validation_error` | `endpoint` is not an `https` URL or is not on a known push service or is too long, or a key is missing or not valid base64url |
 
 ---
 
