@@ -327,7 +327,7 @@ Message history, newest first, for scrolling up.
 }
 ```
 - Sorted by `seq`, highest first. For the next page, send the smallest `seq` of this page as `before_seq`
-- `has_more`: false on the oldest page
+- `has_more`: older messages exist (scroll up). False on the oldest page
 - `has_more_after`: with `around_seq` or `after_seq`. True when newer messages exist; for the next page, send the biggest `seq` of this page as `after_seq`. Always false otherwise
 - `around_seq` doesn't need to be a message's `seq`; gaps from edits and reactions are fine
 - `last_seq`: the channel's newest event number. The web app keeps it as its cursor for [POST /sync](#post-sync)
