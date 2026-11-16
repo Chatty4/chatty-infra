@@ -296,7 +296,9 @@ Message history, newest first, for scrolling up.
 
 **Query**
 - `before_seq`: optional. Only messages with a smaller `seq`. Leave it out for the newest page
-- `around_seq`: optional. Jump to a message, e.g. from search: up to `limit / 2` messages with a smaller `seq`, and the rest with `seq >= around_seq`. Can't be sent with `before_seq`
+- `around_seq`: optional. Jump to a message, e.g. from search: up to `limit / 2` messages with a smaller `seq`, and the rest with `seq >= around_seq`
+- `after_seq`: optional. The next `limit` messages with a bigger `seq` (the closest ones, not the newest), for scrolling down after `around_seq`
+- Send only one of `before_seq`, `around_seq`, `after_seq`
 - `limit`: default 50, max 100
 
 **Response 200**
@@ -326,7 +328,7 @@ Message history, newest first, for scrolling up.
 ```
 - Sorted by `seq`, highest first. For the next page, send the smallest `seq` of this page as `before_seq`
 - `has_more`: false on the oldest page
-- `has_more_after`: only with `around_seq`. True when newer messages exist; the web app loads them with [GET /channels/{channel_id}/events](#get-channels-channel_id-events) from the biggest `seq` of the page. Always false without `around_seq`
+- `has_more_after`: with `around_seq` or `after_seq`. True when newer messages exist; for the next page, send the biggest `seq` of this page as `after_seq`. Always false otherwise
 - `around_seq` doesn't need to be a message's `seq`; gaps from edits and reactions are fine
 - `last_seq`: the channel's newest event number. The web app keeps it as its cursor for [POST /sync](#post-sync)
 - Deleted messages are included as "deleted" so the order is kept
@@ -334,7 +336,7 @@ Message history, newest first, for scrolling up.
 **Errors**
 | Status | code | When |
 |---|---|---|
-| 400 | `validation_error` | `before_seq` and `around_seq` sent together |
+| 400 | `validation_error` | more than one of `before_seq`, `around_seq`, `after_seq` |
 | 403 | `cannot_read_channel` | private channel or DM the user is not in, or not in the team |
 | 404 | `channel_not_found` | channel does not exist |
 
