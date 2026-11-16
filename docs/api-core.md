@@ -410,6 +410,7 @@ Edit my profile. `PUT` replaces all editable fields, so send all of them.
 - `timezone`: an IANA name, for example `Europe/Bucharest`
 - `avatar_file_id`: `null` removes the avatar. Otherwise a `ready` file with purpose `avatar`, uploaded by me
 - The avatar it replaces is deleted by the cleanup job (D-17)
+- [DELETE /files/{file_id}](#delete-files-file_id) of my current avatar also removes it from my profile
 
 **Response 200**: the same body as [GET /me](#get-me)
 
@@ -532,6 +533,7 @@ Edit the team's name and icon.
 ```
 - `icon_file_id`: `null` removes the icon. Otherwise a `ready` file with purpose `team_icon` and this `team_id`
 - The icon it replaces is deleted by the cleanup job (D-17)
+- [DELETE /files/{file_id}](#delete-files-file_id) of the current icon also removes it from the team
 
 **Response 200**: the same body as [GET /teams/{team_id}](#get-teams-team_id)
 
@@ -1408,16 +1410,19 @@ Download an avatar or a team icon. Attachments are downloaded through chatty-cha
 ## DELETE /files/{file_id}
 Delete my own file before it is used in a message. Files in messages are removed when the message is deleted (`detach`).
 
+- My current avatar is also removed from my profile: `avatar_file_id` becomes `null`.
+- The icon of a team is also removed from the team: `icon_file_id` becomes `null`. Only an owner or admin of the team can do this, as in [PUT /teams/{team_id}](#put-teams-team_id).
+
 **Auth:** `Authorization: Bearer <JWT>`
 
-**Who:** the owner of the file
+**Who:** the owner of the file. For the icon of a team, the owner of the file must also be an owner or admin of the team.
 
 **Response 204** (no body)
 
 **Errors**
 | Status | code | When |
 |---|---|---|
-| 403 | `forbidden` | the file is not mine |
+| 403 | `forbidden` | the file is not mine, or it is the icon of a team and I am not an owner or admin there |
 | 404 | `file_not_found` | the file doesn't exist or was already deleted |
 | 409 | `file_attached` | the file is in a message (`attached_at` is set) |
 

@@ -17,7 +17,8 @@
     { "key": "client_msg_id", "value": "" },
     { "key": "message_id", "value": "" },
     { "key": "file_id", "value": "" },
-    { "key": "upload_url", "value": "" }
+    { "key": "upload_url", "value": "" },
+    { "key": "download_url", "value": "" }
   ],
   "item": [
     {
@@ -823,6 +824,58 @@
               { "key": "Authorization", "value": "Bearer {{access_token}}" }
             ],
             "description": "Step 3: chatty-core checks the upload and marks the file ready. Sending it again also gives 200. Before the PUT: upload_missing; after 10 minutes: upload_expired."
+          }
+        },
+        {
+          "name": "GET /files/:file_id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var location = pm.response.headers.get('Location');",
+                  "if (location) pm.collectionVariables.set('download_url', location);"
+                ]
+              }
+            }
+          ],
+          "protocolProfileBehavior": { "followRedirects": false },
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/files/:file_id",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "files", ":file_id"],
+              "variable": [{ "key": "file_id", "value": "{{file_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "description": "Download an avatar or a team icon: 302 with a presigned GET URL in Location, valid 5 minutes. Redirects are not followed here, so you can see the 302; the URL is saved as download_url for the next request. The text attachment from POST /files gives 400 use_chatty_chat (attachments go through chatty-chat): upload an avatar first. Not ready, deleted or unknown: 404 file_not_found; a team icon of another team: 403 not_a_team_member."
+          }
+        },
+        {
+          "name": "GET download URL (MinIO, no auth)",
+          "request": {
+            "method": "GET",
+            "url": "{{download_url}}",
+            "description": "The image itself, straight from MinIO, with the file's Content-Type and Content-Disposition inline. No Authorization header: the signature is in the URL. After 5 minutes MinIO answers 403."
+          }
+        },
+        {
+          "name": "DELETE /files/:file_id",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/files/:file_id",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "files", ":file_id"],
+              "variable": [{ "key": "file_id", "value": "{{file_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "description": "Delete my own file that is in no message: 204, no body. Works for pending and ready files; the file and its upload are removed from MinIO. My current avatar is also removed from my profile (GET /me shows avatar_file_id null). A team's current icon is also removed from the team (icon_file_id null), but only if I am an owner or admin there, else 403 forbidden. Sending it again: 404 file_not_found. Someone else's file: 403 forbidden; a file in a message: 409 file_attached."
           }
         }
       ]
