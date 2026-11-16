@@ -861,6 +861,22 @@
             "url": "{{download_url}}",
             "description": "The image itself, straight from MinIO, with the file's Content-Type and Content-Disposition inline. No Authorization header: the signature is in the URL. After 5 minutes MinIO answers 403."
           }
+        },
+        {
+          "name": "DELETE /files/:file_id",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{core_url}}/api/core/v1/files/:file_id",
+              "host": ["{{core_url}}"],
+              "path": ["api", "core", "v1", "files", ":file_id"],
+              "variable": [{ "key": "file_id", "value": "{{file_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "description": "Delete my own file that is in no message: 204, no body. Works for pending and ready files; the file and its upload are removed from MinIO. Sending it again: 404 file_not_found. Someone else's file: 403 forbidden; a file in a message: 409 file_attached."
+          }
         }
       ]
     },
