@@ -875,7 +875,7 @@
             "header": [
               { "key": "Authorization", "value": "Bearer {{access_token}}" }
             ],
-            "description": "Delete my own file that is in no message: 204, no body. Works for pending and ready files; the file and its upload are removed from MinIO. Sending it again: 404 file_not_found. Someone else's file: 403 forbidden; a file in a message: 409 file_attached."
+            "description": "Delete my own file that is in no message: 204, no body. Works for pending and ready files; the file and its upload are removed from MinIO. My current avatar is also removed from my profile (GET /me shows avatar_file_id null). A team's current icon is also removed from the team (icon_file_id null), but only if I am an owner or admin there, else 403 forbidden. Sending it again: 404 file_not_found. Someone else's file: 403 forbidden; a file in a message: 409 file_attached."
           }
         }
       ]
