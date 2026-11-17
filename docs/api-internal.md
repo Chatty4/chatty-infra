@@ -13,8 +13,8 @@ Source: the chatty-core Confluence page (section 4, internal endpoints) and `doc
 - [GET /internal/channels/{channel_id}](#get-internal-channels-channel_id)
 
 **Files**
-- [POST /internal/files/{file_id}/attach](#post-internal-files-file_id-attach)
-- [POST /internal/files/{file_id}/detach](#post-internal-files-file_id-detach)
+- [POST /internal/files/attach](#post-internal-files-attach)
+- [POST /internal/files/detach](#post-internal-files-detach)
 
 **Health**
 - [GET /health](#get-health)
@@ -64,7 +64,7 @@ Every error has the same body as in [api-core.md](api-core.md#common-errors):
 | 401 | `invalid_service_token` | missing or wrong `X-Service-Token` |
 | 500 | `internal_error` | a bug; the response has a `request_id` to find it in the logs |
 
-The errors below each endpoint are only the ones specific to it.
+The errors below each endpoint are only the ones specific to it. One exception to the body: the file errors of [attach](#post-internal-files-attach) also have `fields.file_id`, the file that failed.
 
 ---
 
@@ -187,37 +187,46 @@ One channel with all its members and their notification settings. Used to check 
 
 # Files
 
-<a id="post-internal-files-file_id-attach"></a>
-## POST /internal/files/{file_id}/attach
-Called **before** chatty-chat saves a message with files (D-03). chatty-core checks the file and marks it attached (`attached_at`) in one step, so its cleanup job never deletes a file that is in a sent message. The response has what chatty-chat stores in its `attachments` table to show and sign downloads without calling chatty-core again (D-02).
+<a id="post-internal-files-attach"></a>
+## POST /internal/files/attach
+Called **before** chatty-chat saves a message with files, once for all its files (D-03). chatty-core checks every file and marks them attached (`attached_at`) in one transaction: either all of them are attached or none is. That way its cleanup job never deletes a file that is in a sent message, and a message with one bad file changes nothing. The response has what chatty-chat stores in its `attachments` table to show and sign downloads without calling chatty-core again (D-02).
 
 **Auth:** `X-Service-Token: <token>`
 
-**Who:** chatty-chat `api`, once per file, while handling `POST /channels/{channel_id}/messages`
+**Who:** chatty-chat `api`, once per message, while handling `POST /channels/{channel_id}/messages`
 
 **Request**
 ```json
 {
   "user_id": "u7…",
-  "channel_id": "c8…"
+  "channel_id": "c8…",
+  "file_ids": ["f6…", "f9…"]
 }
 ```
 - `user_id`: the sender of the message
 - `channel_id`: the channel the message is sent to
+- `file_ids`: 1–10 different file IDs, in the order of the message
 
 **Response 200**
 ```json
 {
-  "file_id": "f6…",
-  "object_key": "attachments/t1…/f6…",
-  "filename": "report.pdf",
-  "mime": "application/pdf",
-  "size": 482133,
-  "attached_at": "2026-10-06T12:00:03Z"
+  "attachments": [
+    {
+      "file_id": "f6…",
+      "object_key": "attachments/t1…/f6…",
+      "filename": "report.pdf",
+      "mime": "application/pdf",
+      "size": 482133,
+      "attached_at": "2026-10-06T12:00:03Z"
+    }
+  ]
 }
 ```
+- One entry per file, in the order of `file_ids`.
 
-**Checks, in this order**
+**Checks**
+
+The channel first, then the files in the order of `file_ids`, each one with these checks in this order. The first check that fails is the answer, and no file is attached.
 1. The file exists and was not deleted.
 2. It was uploaded by `user_id`.
 3. Its purpose is `attachment`.
@@ -225,9 +234,25 @@ Called **before** chatty-chat saves a message with files (D-03). chatty-core che
 5. Its status is `ready`.
 6. It is not attached yet.
 
+chatty-core locks the file rows (sorted by ID) for the checks, the same lock that `DELETE /files/{file_id}` and the cleanup job take (D-17). A file deleted or attached at the same moment is either seen by the checks or waits for them.
+
 **Errors**
+
+For the file errors, `fields.file_id` names the file that failed:
+```json
+{
+  "error": {
+    "code": "file_not_ready",
+    "message": "The upload was not confirmed",
+    "fields": { "file_id": "f9…" }
+  }
+}
+```
+
 | Status | code | When |
 |---|---|---|
+| 400 | `validation_error` | `file_ids` empty, more than 10 or with duplicates; an ID is not a UUID |
+| 404 | `channel_not_found` | no channel with this ID, or its team was deleted |
 | 404 | `file_not_found` | no file with this ID, or it was deleted |
 | 403 | `not_file_owner` | the file was uploaded by another user |
 | 400 | `wrong_purpose` | the file is an avatar or a team icon |
@@ -236,28 +261,38 @@ Called **before** chatty-chat saves a message with files (D-03). chatty-core che
 | 409 | `file_already_attached` | the file is already in a message |
 
 - chatty-chat checks `client_msg_id` before calling `attach`, so a retried send returns the original message instead of attaching the files again.
-- If one file fails, chatty-chat calls [detach](#post-internal-files-file_id-detach) for the files already attached in that request and rejects the message.
+- A failed check attaches nothing, so chatty-chat has nothing to undo: it rejects the message and the user can send the files again.
+- chatty-chat undoes an attach only when it answered `200`: if saving the message then fails, and no message with this `client_msg_id` was saved, it calls [detach](#post-internal-files-detach) for these files. They are deleted, so the user uploads them again.
+- If the outcome is unknown (timeout, lost response), chatty-chat undoes nothing. The files may stay attached to no message: a retry then gets `file_already_attached`, and the user uploads them again. A file of a sent message is never touched.
 
 ---
 
-<a id="post-internal-files-file_id-detach"></a>
-## POST /internal/files/{file_id}/detach
-Called when a message with this file is deleted, or when saving the message failed after [attach](#post-internal-files-file_id-attach). chatty-core sets `attached_at` to empty and `deleted_at` to now. The file can't be attached or downloaded anymore, and the cleanup job removes it from MinIO.
+<a id="post-internal-files-detach"></a>
+## POST /internal/files/detach
+Called when a message with files is deleted, or when saving a message failed after a successful [attach](#post-internal-files-attach). chatty-core sets `attached_at` to empty and `deleted_at` to now on each file. The files can't be attached or downloaded anymore, and the cleanup job removes them from MinIO.
 
 **Auth:** `X-Service-Token: <token>`
 
 **Who:** chatty-chat `api`, after `DELETE /messages/{id}` commits, or after a failed save
 
-**Request**: no body
+**Request**
+```json
+{
+  "file_ids": ["f6…", "f9…"]
+}
+```
+- `file_ids`: 1–10 different file IDs, the files of one message
 
-**Response 204** (no body). Also 204 if the file was already detached, so chatty-chat can retry safely.
+**Response 204** (no body).
+- Also 204 for a file that was already detached or deleted, or that doesn't exist, so chatty-chat can retry the whole call safely.
+- Only attachments are changed: an avatar or a team icon in `file_ids` is skipped.
 
 **Errors**
 | Status | code | When |
 |---|---|---|
-| 404 | `file_not_found` | no file with this ID |
+| 400 | `validation_error` | `file_ids` empty, more than 10 or with duplicates; an ID is not a UUID |
 
-- If this call fails, chatty-chat retries it later. If it is lost, the file only stays attached but unused, which is harmless.
+- If this call fails, chatty-chat retries it later. If it is lost, the files only stay attached but unused, which is harmless.
 
 ---
 

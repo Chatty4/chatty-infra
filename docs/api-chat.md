@@ -199,7 +199,8 @@ Send a message. A retry with the same `client_msg_id` returns the original messa
 - `client_msg_id`: a UUID made by the web app for this message. The same value on a retry returns the original, even if the channel was archived or its team deleted since. The same value already used for a message in another channel returns `400 validation_error` with `fields.client_msg_id: "already_used"`
 - `body`: 1–4000 chars, required unless `file_ids` is not empty. The body isn't trimmed, so a body of only spaces counts as text
 - `file_ids`: max 10, each must be a `ready` attachment uploaded by the sender in the channel's team ([upload in chatty-core](api-core.md#post-files))
-- Before saving, chatty-chat calls chatty-core's `attach` for each file (D-03). If one fails, the files already attached in this request are detached and nothing is saved
+- Before saving, chatty-chat calls chatty-core's `attach` once for all the files (D-03). If one file fails, none is attached and nothing is saved: the user can remove that file and send again
+- If saving fails after the files were attached, they are deleted (D-03). A retry with the same `client_msg_id` then gets `invalid_file`: upload the files again (the web app can do it by itself if it still has them) and send with the new `file_ids`
 
 **Response 201** (200 if it was a retry): a [message object](#message-object)
 ```json
@@ -226,8 +227,8 @@ Send a message. A retry with the same `client_msg_id` returns the original messa
 **Errors**
 | Status | code | When |
 |---|---|---|
-| 400 | `validation_error` | body empty without files, body too long, more than 10 files, `client_msg_id` already used in another channel |
-| 400 | `invalid_file` | a file is not `ready`, not the sender's, of another team or already in a message; `message` names the file |
+| 400 | `validation_error` | body empty without files, body too long, more than 10 files or the same file twice, `client_msg_id` already used in another channel |
+| 400 | `invalid_file` | a file doesn't exist or was deleted, is not `ready`, not the sender's, of another team or already in a message; `message` names the file. No file of the message is attached |
 | 403 | `not_a_member` | user is not in the channel |
 | 404 | `channel_not_found` | channel does not exist |
 | 409 | `channel_archived` | channel is archived or its team was deleted |
@@ -267,7 +268,7 @@ Edit the text of my message. `body` is the only editable field, so the request a
 
 <a id="delete-messages-message_id"></a>
 ## DELETE /messages/{message_id}
-Delete a message. It is a soft delete: the message stays in its place as "deleted", its pins are removed, and chatty-chat calls chatty-core's `detach` for its files (D-03). Its text is also cleared from its earlier `message.created` and `message.edited` events, so [GET /channels/{channel_id}/events](#get-channels-channel_id-events) and [POST /sync](#post-sync) don't return it ([events.md, the event envelope](events.md#envelope)).
+Delete a message. It is a soft delete: the message stays in its place as "deleted", its pins are removed, and after the commit chatty-chat calls chatty-core's `detach` once for all its files (D-03). Its text is also cleared from its earlier `message.created` and `message.edited` events, so [GET /channels/{channel_id}/events](#get-channels-channel_id-events) and [POST /sync](#post-sync) don't return it ([events.md, the event envelope](events.md#envelope)).
 
 **Auth:** `Authorization: Bearer <JWT>`
 

@@ -22,13 +22,20 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
 
 ## D-03: Attaching and detaching files
 - **Status:** accepted
+- **Changed (CHAT-173):** one call for all the files of a message instead of one call per file.
 - **Decision:**
-  - **Send:** before the message transaction starts, chatty-chat calls `POST /internal/files/{file_id}/attach` `{user_id, channel_id}` for each file. chatty-core checks the file belongs to the user, is a `ready` attachment of the channel's team and isn't attached yet, sets `attached_at`, and returns `object_key`, `filename`, `mime`, `size`. chatty-chat stores these in its `attachments` table.
-  - **Saving fails after attach:** chatty-chat calls `POST /internal/files/{file_id}/detach`.
-  - **Message deleted:** chatty-chat calls `detach` for its files. chatty-core sets `deleted_at`, and its cleanup job removes the file from MinIO.
-- **Why:** chatty-core validates the file and marks it in the same call, so the cleanup job never deletes a file that is in a sent message. If a `detach` call is lost, the file just stays attached but unused, which is harmless.
-- **Rejected:** attach after the commit (a failed call could let the cleanup job delete a sent file); chatty-core reads `message.created` from Kafka (+1–1.5 days, Kafka in Django).
-- **Plan impact:** none in days. The Jira descriptions of CHAT-173 and CHAT-212 still mention `GET /internal/files/{id}` and need updating to attach/detach.
+  - **Send:** before the message transaction starts, chatty-chat calls `POST /internal/files/attach` `{user_id, channel_id, file_ids}` once. chatty-core checks every file (it belongs to the user, is a `ready` attachment of the channel's team and isn't attached yet) and sets `attached_at` on all of them in one transaction, or on none if one check fails. It returns `object_key`, `filename`, `mime`, `size` for each file. chatty-chat stores these in its `attachments` table.
+  - **A check fails:** nothing was attached, so there is nothing to undo. chatty-chat rejects the message.
+  - **Saving fails after attach answered 200:** if no message with this `client_msg_id` was saved, chatty-chat calls `POST /internal/files/detach` `{file_ids}`. The files are deleted; the user uploads them again.
+  - **Outcome of attach unknown** (timeout, lost response): chatty-chat undoes nothing. The files may stay attached to no message; a retry gets `file_already_attached` and the user uploads them again.
+  - **Message deleted:** chatty-chat calls `detach` once for its files. chatty-core sets `deleted_at`, and its cleanup job removes the files from MinIO.
+- **Why:** chatty-core validates the files and marks them in the same call, so the cleanup job never deletes a file that is in a sent message. All or nothing means a message with one bad file doesn't delete the user's other files, and a send is one call instead of up to ten. chatty-chat only undoes an attach it knows succeeded, so a file of a sent message is never detached by mistake. If a `detach` call is lost, the files just stay attached but unused, which is harmless.
+- **Rejected:**
+  - attach after the commit (a failed call could let the cleanup job delete a sent file);
+  - chatty-core reads `message.created` from Kafka (+1–1.5 days, Kafka in Django);
+  - one call per file (a failure on the third file meant detaching, and so deleting, the first two; up to 19 calls per send);
+  - a `release` call that only clears `attached_at` after a failed save, so the files can be sent again. Nice to have but rare: the web app can upload the files again itself. It can be added later without breaking anything.
+- **Plan impact:** none in days. CHAT-173 (chatty-core endpoints) and CHAT-212 (chatty-chat calls) use the bulk calls.
 
 ## D-04: A hidden DM gets a new message
 - **Status:** accepted
