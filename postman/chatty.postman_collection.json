@@ -1244,6 +1244,38 @@
               { "key": "X-Service-Token", "value": "{{service_token}}" }
             ]
           }
+        },
+        {
+          "name": "POST /internal/files/attach",
+          "request": {
+            "method": "POST",
+            "url": "{{core_url}}/internal/files/attach",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Service-Token", "value": "{{service_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{me_id}}\",\n  \"channel_id\": \"{{channel_id}}\",\n  \"file_ids\": [\"{{file_id}}\"]\n}"
+            },
+            "description": "What chatty-chat calls before saving a message with files (D-03): all the files are attached, or none. Before: run GET /me (sets me_id), POST /teams (sets team_id and channel_id, the general channel), and the Files folder up to confirm with the default text attachment (sets file_id). 200 with object_key, filename, mime, size and attached_at for each file. Sending it again: 409 file_already_attached. An avatar: 400 wrong_purpose. A file that fails names it in error.fields.file_id. Not reachable through Nginx: call chatty-core directly."
+          }
+        },
+        {
+          "name": "POST /internal/files/detach",
+          "request": {
+            "method": "POST",
+            "url": "{{core_url}}/internal/files/detach",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Service-Token", "value": "{{service_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"file_ids\": [\"{{file_id}}\"]\n}"
+            },
+            "description": "What chatty-chat calls after a message with files is deleted, or after its save failed (D-03): the attachments are deleted. Always 204, also when nothing changed, so it can be retried. Unknown ids, deleted files, avatars and team icons are skipped. Afterwards, attach with the same file gives 404 file_not_found."
+          }
         }
       ]
     }
