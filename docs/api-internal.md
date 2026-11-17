@@ -252,7 +252,7 @@ For the file errors, `fields.file_id` names the file that failed:
 | Status | code | When |
 |---|---|---|
 | 400 | `validation_error` | `file_ids` empty, more than 10 or with duplicates; an ID is not a UUID |
-| 404 | `channel_not_found` | no channel with this ID |
+| 404 | `channel_not_found` | no channel with this ID, or its team was deleted |
 | 404 | `file_not_found` | no file with this ID, or it was deleted |
 | 403 | `not_file_owner` | the file was uploaded by another user |
 | 400 | `wrong_purpose` | the file is an avatar or a team icon |
