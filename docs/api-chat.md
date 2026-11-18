@@ -26,7 +26,7 @@ Source: the chatty-chat Confluence page (sections 5 and 8) and `docs/decisions.m
 - [GET /channels/{channel_id}/pins](#get-channels-channel_id-pins)
 
 **Attachments**
-- [GET /attachments/{file_id}](#get-attachments-file_id)
+- [GET /messages/{message_id}/attachments](#get-messages-message_id-attachments)
 
 **Read state and search**
 - [POST /channels/{channel_id}/read](#post-channels-channel_id-read)
@@ -172,7 +172,7 @@ Returned by the message endpoints and inside `message.created` events.
 - `client_msg_id`: the UUID the author's app sent with [POST /channels/{channel_id}/messages](#post-channels-channel_id-messages). The author's app uses it to replace its pending copy of the message, whether the POST response or the `message.created` event arrives first.
 - `body`: a mention is stored as `<@user_id>`. The web app shows the display name from chatty-core's [team members](api-core.md#get-teams-team_id-members).
 - `mentions`: the mentioned users who are members of the channel. Mentions of other users stay in the text but are not in this list.
-- `attachments`: what chatty-core's `attach` returned (D-03). Download with [GET /attachments/{file_id}](#get-attachments-file_id).
+- `attachments`: what chatty-core's `attach` returned (D-03), in the order they were sent. They have no URL: get short-lived download URLs with [GET /messages/{message_id}/attachments](#get-messages-message_id-attachments) when the message is shown.
 - `reactions`: one entry per emoji; `me` is true if the current user reacted with it.
 - A deleted message keeps its `id` and `seq` (so the order doesn't change) but has `body: ""`, empty `file_ids`, `attachments`, `mentions` and `reactions`, and `deleted_at` set.
 
@@ -598,21 +598,39 @@ Pinned messages of a channel, newest pin first. Not paginated: max 100 pins per 
 
 # Attachments
 
-<a id="get-attachments-file_id"></a>
-## GET /attachments/{file_id}
-Download a file of a message. chatty-chat checks that the user can read the message's channel, then redirects to a MinIO URL it signs itself with its read-only key (D-02). Avatars and team icons are downloaded from chatty-core ([GET /files/{file_id}](api-core.md#get-files-file_id)).
+<a id="get-messages-message_id-attachments"></a>
+## GET /messages/{message_id}/attachments
+Download URLs for the files of a message. chatty-chat checks that the user can read the message's channel, then signs one MinIO URL per file with its read-only key (D-02). The URLs need no token, so the web app puts them straight into `<img src>` and `<a href>`. Avatars and team icons are downloaded from chatty-core ([GET /files/{file_id}](api-core.md#get-files-file_id)).
 
 **Auth:** `Authorization: Bearer <JWT>`
 
-**Who:** users who [can read](#access) the channel of the message that has the file
+**Who:** users who [can read](#access) the channel of the message
 
-**Response 302**: `Location` header with a presigned GET URL, valid 5 minutes
+**Response 200**
+```json
+{
+  "attachments": [
+    {
+      "file_id": "f6…",
+      "filename": "report.pdf",
+      "mime": "application/pdf",
+      "size": 482133,
+      "url": "http://127.0.0.1:9000/chatty/attachments/t1…/f6…?X-Amz-Algorithm=…",
+      "expires_at": "2026-10-05T14:07:11Z"
+    }
+  ]
+}
+```
+- One entry per file, in the order they were sent; `[]` for a message without files.
+- `url`: a presigned GET URL for the public MinIO address, valid 5 minutes (`expires_at`). Its answer has the file's `Content-Type` and `Content-Disposition: attachment; filename*=UTF-8''…`, so a link downloads the file under its name and an uploaded HTML or SVG file is never opened as a page (D-16). An `<img>` still shows an image.
+- The URL can't be revoked: someone removed from the channel can still use one they already have until it expires.
+- **Expired URLs:** an image already shown stays on screen. For a new load or a click, the web app first calls this endpoint again if `expires_at` is less than a minute away, or after an image fails to load.
+- The message object itself has no URLs: it is stored in `message.created` for 30 days and replayed by [POST /sync](#post-sync), long after a URL would expire.
 
 **Errors**
 | Status | code | When |
 |---|---|---|
-| 403 | `cannot_read_channel` | the user can't read the message's channel |
-| 404 | `attachment_not_found` | no message has this file, or the message was deleted |
+| 404 | `message_not_found` | the message doesn't exist, was deleted, or the user can't read its channel |
 
 ---
 

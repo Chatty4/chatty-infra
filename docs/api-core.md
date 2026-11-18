@@ -1389,7 +1389,7 @@ How it works (D-15): chatty-core copies `uploads/{file_id}` to the final key, ch
 
 <a id="get-files-file_id"></a>
 ## GET /files/{file_id}
-Download an avatar or a team icon. Attachments are downloaded through chatty-chat (`GET /attachments/{file_id}`, D-02).
+Download an avatar or a team icon. Attachments are downloaded through chatty-chat (`GET /messages/{message_id}/attachments`, D-02).
 
 **Auth:** `Authorization: Bearer <JWT>`
 
