@@ -924,6 +924,47 @@
           }
         },
         {
+          "name": "POST /channels/:channel_id/messages (with a file)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// a new message each run; send it twice without this to see the retry (200)",
+                  "pm.collectionVariables.set('client_msg_id', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var body = pm.response.json();",
+                  "if (body.id) pm.collectionVariables.set('message_id', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{chat_url}}/api/chat/v1/channels/:channel_id/messages",
+              "host": ["{{chat_url}}"],
+              "path": ["api", "chat", "v1", "channels", ":channel_id", "messages"],
+              "variable": [{ "key": "channel_id", "value": "{{channel_id}}" }]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_msg_id\": \"{{client_msg_id}}\",\n  \"body\": \"here are the notes\",\n  \"file_ids\": [\"{{file_id}}\"]\n}"
+            },
+            "description": "A message with a file (D-03). Before: in the Files folder, POST /files (a text attachment of {{team_id}}), the PUT and confirm; that sets file_id. body may be empty when file_ids isn't. 201 with file_ids and attachments (file_id, filename, mime, size). Sending the same file in a new message: 400 invalid_file, the message names the file. The same file twice in file_ids: 400 validation_error. chatty-core down: 503 core_unavailable. Deleting the message (DELETE /messages/:message_id) detaches its files: attaching the file again (Internal folder) then gives 404."
+          }
+        },
+        {
           "name": "GET /channels/:channel_id/messages",
           "request": {
             "method": "GET",
