@@ -215,7 +215,8 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
 - **Decision:** chatty-core's cleanup job (every hour, as in the File upload diagram on the
   chatty-core Confluence page) also deletes:
   - attachments that are `ready` but still not attached to a message 24 hours after upload;
-  - avatars and team icons that were replaced and are no longer used.
+  - avatars and team icons that were replaced and are no longer used;
+  - files of a deleted team, attached or not: the team answers 404 everywhere and can't be restored.
 
   An unattached attachment is marked deleted under the same row lock that `attach` takes, so a
   message sent at that moment either attaches it first (the job skips it) or gets `file_not_found`.

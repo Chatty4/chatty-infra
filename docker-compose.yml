@@ -106,8 +106,9 @@ services:
       start_period: 20s
 
   # chatty-core (Django, ASGI), built from ../chatty-core. The code is mounted, so --reload picks up changes.
-  # On every container start: pending migrations are applied, then a background loop purges refresh
-  # tokens expired or revoked more than 30 days ago, once a day (CHAT-256).
+  # On every container start: pending migrations are applied, then two background loops run:
+  # refresh tokens expired or revoked more than 30 days ago are purged once a day (CHAT-256), and
+  # unused files are removed from MinIO and the database every hour (CHAT-168, D-17).
   # shortcut: the 24h timer restarts with the container; production needs a real scheduled job.
   # The health check comes from chatty-core's Dockerfile (GET /health).
   core:
@@ -116,7 +117,7 @@ services:
     # chatty-chat calls http://chatty-core:8000/internal/... (api-internal.md), so the name is fixed.
     container_name: chatty-core
     # exec: uvicorn replaces the shell, so it gets docker's stop signal directly.
-    command: sh -c "python manage.py migrate --noinput && { (while true; do python manage.py purge_refresh_tokens; sleep 86400; done) & exec uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload; }"
+    command: sh -c "python manage.py migrate --noinput && { (while true; do python manage.py purge_refresh_tokens; sleep 86400; done) & (while true; do python manage.py clean_up_files; sleep 3600; done) & exec uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload; }"
     env_file:
       - path: ../chatty-core/.env
         required: false
