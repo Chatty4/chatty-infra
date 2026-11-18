@@ -548,7 +548,7 @@ Edit the team's name and icon.
 
 <a id="delete-teams-team_id"></a>
 ## DELETE /teams/{team_id}
-Delete the team. It is a soft delete: the team disappears for everyone, and a cleanup job removes its files later. Publishes `team.deleted`.
+Delete the team. It is a soft delete: the team disappears for everyone, and a cleanup job removes its files within an hour. Publishes `team.deleted`.
 
 **Auth:** `Authorization: Bearer <JWT>`
 
