@@ -19,7 +19,8 @@
     { "key": "file_id", "value": "" },
     { "key": "upload_url", "value": "" },
     { "key": "download_url", "value": "" },
-    { "key": "attachment_url", "value": "" }
+    { "key": "attachment_url", "value": "" },
+    { "key": "search_cursor", "value": "" }
   ],
   "item": [
     {
@@ -1249,6 +1250,47 @@
             "header": [
               { "key": "Authorization", "value": "Bearer {{access_token}}" }
             ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search (chatty-chat)",
+      "item": [
+        {
+          "name": "GET /search",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var body = pm.response.json();",
+                  "pm.collectionVariables.set('search_cursor', body.next_cursor || '');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{chat_url}}/api/chat/v1/search?team_id={{team_id}}&q=deploy&limit=20",
+              "host": ["{{chat_url}}"],
+              "path": ["api", "chat", "v1", "search"],
+              "query": [
+                { "key": "team_id", "value": "{{team_id}}", "description": "required" },
+                { "key": "q", "value": "deploy", "description": "required, 2-200 chars" },
+                { "key": "in", "value": "{{channel_id}}", "description": "optional: one channel", "disabled": true },
+                { "key": "from", "value": "{{me_id}}", "description": "optional: one author", "disabled": true },
+                { "key": "before", "value": "2026-12-31T00:00:00Z", "description": "optional, ISO 8601", "disabled": true },
+                { "key": "after", "value": "2026-01-01T00:00:00Z", "description": "optional, ISO 8601", "disabled": true },
+                { "key": "limit", "value": "20", "description": "default 20, max 50" },
+                { "key": "cursor", "value": "{{search_cursor}}", "description": "the next_cursor of the previous page", "disabled": true }
+              ]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "description": "Full-text search in the messages of one team, only in channels you can read (post-MVP). Send a message with \"deploy\" in it first (POST /channels/:channel_id/messages does). Best match first, then newest; deleted messages are never returned; highlight marks the matches. Saves next_cursor as search_cursor: enable the cursor parameter for the next page. Errors: q too short or too long, or no team_id: 400 validation_error; a cursor of another query: 400 invalid_cursor; a team you're not in: 403 not_a_team_member."
           }
         }
       ]
