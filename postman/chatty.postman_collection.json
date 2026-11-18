@@ -18,7 +18,8 @@
     { "key": "message_id", "value": "" },
     { "key": "file_id", "value": "" },
     { "key": "upload_url", "value": "" },
-    { "key": "download_url", "value": "" }
+    { "key": "download_url", "value": "" },
+    { "key": "attachment_url", "value": "" }
   ],
   "item": [
     {
@@ -962,6 +963,41 @@
               "raw": "{\n  \"client_msg_id\": \"{{client_msg_id}}\",\n  \"body\": \"here are the notes\",\n  \"file_ids\": [\"{{file_id}}\"]\n}"
             },
             "description": "A message with a file (D-03). Before: in the Files folder, POST /files (a text attachment of {{team_id}}), the PUT and confirm; that sets file_id. body may be empty when file_ids isn't. 201 with file_ids and attachments (file_id, filename, mime, size). Sending the same file in a new message: 400 invalid_file, the message names the file. The same file twice in file_ids: 400 validation_error. chatty-core down: 503 core_unavailable. Deleting the message (DELETE /messages/:message_id) detaches its files: attaching the file again (Internal folder) then gives 404."
+          }
+        },
+        {
+          "name": "GET /messages/:message_id/attachments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var files = pm.response.json().attachments || [];",
+                  "if (files.length) pm.collectionVariables.set('attachment_url', files[0].url);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{chat_url}}/api/chat/v1/messages/:message_id/attachments",
+              "host": ["{{chat_url}}"],
+              "path": ["api", "chat", "v1", "messages", ":message_id", "attachments"],
+              "variable": [{ "key": "message_id", "value": "{{message_id}}" }]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "description": "Download URLs for the files of a message (D-02): one presigned MinIO URL per file, in the order they were sent, valid 5 minutes (expires_at). Run POST /channels/:channel_id/messages (with a file) first; it sets message_id. Saves the first URL as attachment_url. A message without files: attachments []. A deleted or unknown message, or a channel you can't read: 404 message_not_found."
+          }
+        },
+        {
+          "name": "GET attachment URL (MinIO, no auth)",
+          "request": {
+            "method": "GET",
+            "url": "{{attachment_url}}",
+            "description": "The file itself, straight from MinIO, with its Content-Type and Content-Disposition: attachment and its filename. No Authorization header: the signature is in the URL. After 5 minutes MinIO answers 403; call GET /messages/:message_id/attachments again."
           }
         },
         {

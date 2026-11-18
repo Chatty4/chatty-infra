@@ -15,10 +15,14 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
 
 ## D-02: Attachment download
 - **Status:** accepted
-- **Decision:** chatty-chat has a read-only MinIO key for the `attachments/` prefix only. `GET /attachments/{file_id}` checks that the user can read the message's channel, then redirects to a presigned GET URL it signs itself (valid 5 minutes). Avatars and team icons are downloaded through chatty-core's `GET /files/{file_id}`.
-- **Why:** One request, no extra call to chatty-core per download.
-- **Rejected:** chatty-core adds `GET /internal/files/{id}/download-url` (extra call per download, +0.5 day for chatty-core).
-- **Plan impact:** none (CHAT-213 "Download attachments through chatty-chat").
+- **Changed (CHAT-213):** one call per message that returns the URLs, instead of a redirect per file.
+- **Decision:** chatty-chat has a read-only MinIO key for the `attachments/` prefix only. `GET /messages/{message_id}/attachments` checks that the user can read the message's channel, then returns a presigned GET URL per file that it signs itself (valid 5 minutes, with `expires_at`). The web app uses the URLs directly in `<img src>` and `<a href>`, and asks again when one is about to expire. Avatars and team icons are downloaded through chatty-core's `GET /files/{file_id}`.
+- **Why:** no extra call to chatty-core per download, and one call to chatty-chat per message instead of one per file. The web app sends its token in the `Authorization` header, which `<img src>` and `<a href>` can't do, so a link to a chatty-chat endpoint can't be used directly; a presigned URL needs no token. This is the usual pattern for clients that authenticate with a token rather than a cookie.
+- **Rejected:**
+  - chatty-core adds `GET /internal/files/{id}/download-url` (extra call per download, +0.5 day for chatty-core);
+  - `GET /attachments/{file_id}` with a 302 to the signed URL: the web app would have to fetch every file with its token and show it from a blob, and the CSP would need `connect-src` for MinIO and `blob:` images. It only fits cookie-based clients. It can be added later next to this endpoint if a file link has to work outside the web app;
+  - URLs inside the message object: `message.created` is stored for 30 days and replayed by `POST /sync`, long after a URL expires.
+- **Plan impact:** none in days (CHAT-213 "Download attachments through chatty-chat", CHAT-214 refreshes expired URLs). chatty-web's CSP needs the public MinIO origin in `img-src`.
 
 ## D-03: Attaching and detaching files
 - **Status:** accepted
