@@ -405,13 +405,14 @@ Every channel event is also written to Kafka, for the services that are not the 
 
 **How an event gets there (outbox relay)**
 1. The REST endpoint saves the change and the `channel_events` row in one database transaction, then commits.
-2. The relay selects up to 100 rows with `published_at IS NULL`, in `id` order, `FOR UPDATE`. Not `SKIP LOCKED`: deleting a message locks its `message.created` row, and skipping that row would publish the channel's later events first.
-3. It produces them to Kafka in that order and waits for the acknowledgement.
-4. It sets `published_at = now()` and commits. After a full batch it starts the next one right away.
+2. The relay selects up to 100 rows with `published_at IS NULL`, in `id` order, without a row lock, and ends that read's transaction. Only one relay runs (see below), so nothing else takes the same rows, and deleting a message never waits for the relay or for Kafka.
+3. With no transaction open, it produces them to Kafka in that order and waits until Kafka acknowledges all of them.
+4. In a short transaction of its own, it sets `published_at = now()` on those rows. After a full batch it starts the next one right away.
 5. Otherwise it waits for `NOTIFY chat_events` or 200 ms, whichever comes first. A trigger on `channel_events` sends the NOTIFY; Postgres delivers it when the inserting transaction commits. The poll catches a NOTIFY lost while the relay was restarting.
 
 - Exactly **one** relay runs: it holds a Postgres advisory lock, so a second relay waits until the first one stops. Two relays could publish the events of a channel out of order.
 - If Kafka is down, rows stay unpublished and are sent when it is back. The REST endpoints keep working.
+- A message deleted while its batch is on the way reaches Kafka with its old text, as one deleted after its event was sent always did. The push worker skips deleted messages, and Kafka drops the record after 7 days.
 - The nightly cleanup deletes only published events, so an event never leaves the outbox before it reached Kafka.
 - The relay runs as the `relay` service in chatty-infra's compose (`python -m app.jobs.relay`, chatty-chat).
 
