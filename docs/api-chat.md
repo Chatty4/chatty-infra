@@ -58,6 +58,7 @@ Source: the chatty-chat Confluence page (sections 5 and 8) and `docs/decisions.m
 - [Authorization](#authorization)
 - [Who can read and write a channel](#access)
 - [Errors that every endpoint can return](#common-errors)
+- [Rate limits](#rate-limits)
 - [Pagination](#pagination)
 - [The message object](#message-object)
 
@@ -112,11 +113,32 @@ Every error has the same body as in chatty-core:
 | 400 | `validation_error` | a field is missing, has the wrong type or breaks a limit |
 | 401 | `unauthorized` | no token, a bad signature, or the access token expired |
 | 403 | `user_inactive` | the user was deactivated by a platform admin |
-| 429 | `rate_limited` | too many requests; the `Retry-After` header says when to try again |
+| 429 | `rate_limited` | too many requests, see [Rate limits](#rate-limits); the `Retry-After` header says when to try again |
 | 500 | `internal_error` | a bug; the response has a `request_id` to find it in the logs |
 | 503 | `core_unavailable` | chatty-core could not be reached to check access and nothing was cached; try again |
 
 The errors below each endpoint are only the ones specific to it.
+
+<a id="rate-limits"></a>
+## Rate limits
+
+Limits are per user, counted in Redis in fixed windows of one minute (one second for `watch`). Over a limit, a REST request gets `429 rate_limited` with a `Retry-After` header in seconds. If Redis is unavailable, rate limits are skipped and the request proceeds.
+
+| Endpoint | Limit per user |
+|---|---|
+| [POST /channels/{channel_id}/messages](#post-channels-channel_id-messages) | 60 / min |
+| [PUT /messages/{message_id}](#put-messages-message_id) | 30 / min |
+| [DELETE /messages/{message_id}](#delete-messages-message_id) | 30 / min |
+| [PUT](#put-messages-message_id-reactions-emoji) and [DELETE](#delete-messages-message_id-reactions-emoji) `/messages/{message_id}/reactions/{emoji}` | 60 / min together, and at most 20 different emoji per user on one message (`409 reaction_limit_reached`) |
+| [POST](#post-channels-channel_id-pins-message_id) and [DELETE](#delete-channels-channel_id-pins-message_id) `/channels/{channel_id}/pins/{message_id}` | 20 / min together |
+| [POST /channels/{channel_id}/read](#post-channels-channel_id-read) | 120 / min |
+| [GET /channels/{channel_id}/messages](#get-channels-channel_id-messages) | 120 / min |
+| [GET /channels/{channel_id}/events](#get-channels-channel_id-events) | 120 / min |
+| [POST /sync](#post-sync) | 20 / min |
+| [GET /search](#get-search) | 30 / min |
+| [POST](#post-push-subscriptions) and [DELETE](#delete-push-subscriptions) `/push/subscriptions` | 10 / min together |
+| WebSocket `watch` | 1 / s per socket; more are ignored without an `error` |
+| [GET /messages/{message_id}/attachments](#get-messages-message_id-attachments), [GET /channels/{channel_id}/pins](#get-channels-channel_id-pins), [GET /unread](#get-unread), [GET /teams/{team_id}/presence](#get-teams-team_id-presence), `heartbeat`, `/health` | no limit |
 
 ---
 
@@ -232,6 +254,7 @@ Send a message. A retry with the same `client_msg_id` returns the original messa
 | 403 | `not_a_member` | user is not in the channel |
 | 404 | `channel_not_found` | channel does not exist |
 | 409 | `channel_archived` | channel is archived or its team was deleted |
+| 429 | `rate_limited` | more than 60 messages per minute; `Retry-After` says when to try again |
 
 ---
 
@@ -263,6 +286,7 @@ Edit the text of my message. `body` is the only editable field, so the request a
 | 404 | `message_not_found` | the message doesn't exist, or the user can't read its channel |
 | 409 | `message_deleted` | the message was deleted |
 | 409 | `channel_archived` | the channel is archived or its team was deleted |
+| 429 | `rate_limited` | more than 30 edits per minute; `Retry-After` says when to try again |
 
 ---
 
@@ -284,6 +308,7 @@ Delete a message. It is a soft delete: the message stays in its place as "delete
 | 403 | `forbidden` | the user is not the author, the channel owner or a team owner or admin |
 | 404 | `message_not_found` | the message doesn't exist, or the user can't read its channel |
 | 409 | `channel_archived` | the channel is archived or its team was deleted |
+| 429 | `rate_limited` | more than 30 deletes per minute; `Retry-After` says when to try again |
 
 ---
 
@@ -340,6 +365,7 @@ Message history, newest first, for scrolling up.
 | 400 | `validation_error` | more than one of `before_seq`, `around_seq`, `after_seq` |
 | 403 | `cannot_read_channel` | private channel or DM the user is not in, or not in the team |
 | 404 | `channel_not_found` | channel does not exist |
+| 429 | `rate_limited` | more than 120 history requests per minute; `Retry-After` says when to try again |
 
 ---
 
@@ -401,6 +427,7 @@ Get the missed events of many channels in one call. The web app calls it after i
 | Status | code | When |
 |---|---|---|
 | 400 | `validation_error` | `cursors` missing, more than 500 channels, a negative `seq` |
+| 429 | `rate_limited` | more than 20 syncs per minute; `Retry-After` says when to try again |
 
 ---
 
@@ -440,6 +467,7 @@ The events of one channel after a `seq`. The web app calls it when it sees a gap
 | 403 | `cannot_read_channel` | private channel or DM the user is not in, or not in the team |
 | 404 | `channel_not_found` | channel does not exist |
 | 409 | `gap_too_large` | the events after `after_seq` were already cleaned up (older than 30 days); reload with [GET /channels/{channel_id}/messages](#get-channels-channel_id-messages) |
+| 429 | `rate_limited` | more than 120 event requests per minute; `Retry-After` says when to try again |
 
 ---
 
@@ -468,6 +496,7 @@ Add my reaction to a message. Adding the same emoji twice does nothing.
 }
 ```
 - Also sends a [reaction.added](#event-reaction-added) event, only if the reaction is new
+- A user can have at most 20 different emoji on one message
 
 **Errors**
 | Status | code | When |
@@ -477,6 +506,8 @@ Add my reaction to a message. Adding the same emoji twice does nothing.
 | 404 | `message_not_found` | the message doesn't exist, or the user can't read its channel |
 | 409 | `message_deleted` | the message was deleted |
 | 409 | `channel_archived` | the channel is archived or its team was deleted |
+| 409 | `reaction_limit_reached` | I already have 20 different emoji on this message; remove one first. Adding one I already have is still `200` |
+| 429 | `rate_limited` | more than 60 reaction changes (adds and removes together) per minute; `Retry-After` says when to try again |
 
 ---
 
@@ -498,6 +529,7 @@ Remove my reaction. Removing a reaction I don't have does nothing.
 | 403 | `not_a_member` | user is not in the channel |
 | 404 | `message_not_found` | the message doesn't exist, or the user can't read its channel |
 | 409 | `channel_archived` | the channel is archived or its team was deleted |
+| 429 | `rate_limited` | more than 60 reaction changes (adds and removes together) per minute; `Retry-After` says when to try again |
 
 ---
 
@@ -530,6 +562,7 @@ Pin a message. Max 100 pins per channel.
 | 409 | `message_deleted` | the message was deleted |
 | 409 | `pin_limit_reached` | the channel already has 100 pins |
 | 409 | `channel_archived` | the channel is archived or its team was deleted |
+| 429 | `rate_limited` | more than 20 pin changes (pins and unpins together) per minute; `Retry-After` says when to try again |
 
 ---
 
@@ -550,6 +583,7 @@ Unpin a message.
 | 403 | `not_a_member` | user is not in the channel |
 | 404 | `message_not_found` | the message doesn't exist or is in another channel |
 | 409 | `channel_archived` | the channel is archived or its team was deleted |
+| 429 | `rate_limited` | more than 20 pin changes (pins and unpins together) per minute; `Retry-After` says when to try again |
 
 ---
 
@@ -669,6 +703,7 @@ Mark the channel as read up to `seq`. The read position only moves forward, so a
 | 400 | `validation_error` | `seq` missing or negative |
 | 403 | `not_a_member` | user is not in the channel |
 | 404 | `channel_not_found` | channel does not exist |
+| 429 | `rate_limited` | more than 120 read updates per minute; `Retry-After` says when to try again |
 
 ---
 
@@ -756,6 +791,7 @@ Full-text search in the messages of one team. *Post-MVP*
 | 400 | `validation_error` | `q` too short or too long, `team_id` missing |
 | 400 | `invalid_cursor` | the cursor is broken or was made for another query |
 | 403 | `not_a_team_member` | the user is not in the team |
+| 429 | `rate_limited` | more than 30 searches per minute; `Retry-After` says when to try again |
 
 ---
 
@@ -830,6 +866,7 @@ notifications, and again on every app start, because browsers sometimes change t
 | Status | code | When |
 |---|---|---|
 | 400 | `validation_error` | `endpoint` is not an `https` URL or is not on a known push service or is too long, or a key is missing or not valid base64url |
+| 429 | `rate_limited` | more than 10 subscription changes (saves and deletes together) per minute; `Retry-After` says when to try again |
 
 ---
 
@@ -861,6 +898,7 @@ access token still works.
 | Status | code | When |
 |---|---|---|
 | 400 | `validation_error` | `endpoint` is missing or not an `https` URL |
+| 429 | `rate_limited` | more than 10 subscription changes (saves and deletes together) per minute; `Retry-After` says when to try again |
 
 ---
 
@@ -929,7 +967,7 @@ GET /api/chat/v1/ws?token=eyJhbGciOiJSUzI1NiIs…
 - Invalid JSON, unknown message types and binary frames are ignored without an `error`; the socket stays open
 - A message is at most 4 KB. A bigger one closes the socket with `1009`
 - `typing`: at most once every 3 s per channel, only in channels the user can write in. Anything else is ignored without an `error`
-- `watch`: live updates for one public channel the user has not joined but is looking at. Only for channels in the user's `public_channel_ids`. Max 1 per socket; a new `watch` replaces the old one. No read state or unread counts
+- `watch`: live updates for one public channel the user has not joined but is looking at. Only for channels in the user's `public_channel_ids`. Max 1 per socket; a new `watch` replaces the old one. No read state or unread counts. At most 1 `watch` per second per socket; more are ignored without an `error`
 
 **Server → client**
 ```json
