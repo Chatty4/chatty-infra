@@ -90,7 +90,7 @@ Everything chatty-chat needs to check what a user can read and write (D-07): whe
 
 **Auth:** `X-Service-Token: <token>`
 
-**Who:** chatty-chat `api` and `gateway`, on a cache miss of `members:{user_id}`
+**Who:** chatty-chat `api`, `gateway` and `push-worker`, on a cache miss of `members:{user_id}`
 
 **Response 200**
 ```json

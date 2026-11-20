@@ -215,6 +215,8 @@ A platform admin deactivated a user in Django admin.
 
 **chatty-chat**
 - Deletes `members:{user_id}`.
+- Deletes the user's push subscriptions ([D-13](decisions.md)). If the database is down, this is logged
+  and skipped; the push worker still sends nothing to an inactive user.
 - The gateways close all the user's sockets with code `4003` (`user_inactive`).
 - New requests fail with `403 user_inactive`, because [memberships](api-internal.md#get-internal-users-user_id-memberships) now returns `is_active: false`.
 

@@ -889,6 +889,7 @@ What the push worker sends to a browser for a new message. The payload is encryp
 **Who gets one**, for each `message.created` event:
 - a member of the channel who isn't the author and hasn't muted it, and
 - whose `notify_level` is `all`, or `mentions` and they are mentioned (DMs default to `all`), and
+- who is active (`is_active` in [memberships](api-internal.md#get-internal-users-user_id-memberships)), and
 - who has no Chatty tab on screen (`visible` heartbeat in the last 45 s).
 - One push per user and message, to every browser they subscribed. Events older than 10 minutes are
   skipped: a late notification is noise.
