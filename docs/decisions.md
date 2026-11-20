@@ -151,8 +151,9 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
   database: no HTTP call to chatty-core per message, and pushes keep working while chatty-core is down.
   A subscription is a delivery address for one browser, not profile data; like read state, it lives
   with the service that uses it.
-- **Cost:** when chatty-core deactivates a user, their subscriptions stay until the push service answers
-  `404` or `410 Gone`, and the worker deletes them then.
+- **Cost:** chatty-chat has to delete a deactivated user's subscriptions itself, on
+  [user.deactivated](core-events.md#event-user-deactivated). The push worker also skips users whose
+  memberships say `is_active: false`, in case that event was missed.
 - **Rejected:** subscriptions in chatty-core with two internal endpoints for the push worker (two more
   endpoints and an HTTP call per message, for no gain); an endpoint for the VAPID public key.
 - **Plan impact:** replaces the push sections of `api-core.md` and `api-internal.md`.
