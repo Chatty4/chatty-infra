@@ -32,6 +32,7 @@ Source: the chatty-chat Confluence page (sections 5 and 8) and `docs/decisions.m
 - [POST /channels/{channel_id}/read](#post-channels-channel_id-read)
 - [GET /unread](#get-unread)
 - [GET /search](#get-search) (post-MVP)
+- [GET /search/attachments](#get-search-attachments) (post-MVP)
 
 **Presence**
 - [GET /teams/{team_id}/presence](#get-teams-team_id-presence)
@@ -136,6 +137,7 @@ Limits are per user, counted in Redis in fixed windows of one minute (one second
 | [GET /channels/{channel_id}/events](#get-channels-channel_id-events) | 120 / min |
 | [POST /sync](#post-sync) | 20 / min |
 | [GET /search](#get-search) | 30 / min |
+| [GET /search/attachments](#get-search-attachments) (post-MVP) | `cursor` → `next_cursor`, as in [api-core.md](api-core.md#pagination) | default 20, max 50 |
 | [POST](#post-push-subscriptions) and [DELETE](#delete-push-subscriptions) `/push/subscriptions` | 10 / min together |
 | WebSocket `watch` | 1 / s per socket; more are ignored without an `error` |
 | [GET /messages/{message_id}/attachments](#get-messages-message_id-attachments), [GET /channels/{channel_id}/pins](#get-channels-channel_id-pins), [GET /unread](#get-unread), [GET /teams/{team_id}/presence](#get-teams-team_id-presence), `heartbeat`, `/health` | no limit |
@@ -792,6 +794,48 @@ Full-text search in the messages of one team. *Post-MVP*
 | 400 | `invalid_cursor` | the cursor is broken or was made for another query |
 | 403 | `not_a_team_member` | the user is not in the team |
 | 429 | `rate_limited` | more than 30 searches per minute; `Retry-After` says when to try again |
+
+---
+
+<a id="get-search-attachments"></a>
+## GET /search/attachments
+Search the attachments of one team by what is in them: file name, colors and objects in images,
+text in images, and text in documents. *Post-MVP*
+
+Files are labeled in the background, so a new attachment can take a few minutes to show up.
+Labeled types: images (`image/png`, `image/jpeg`, `image/webp`, `image/gif`), PDF, DOCX, XLSX,
+PPTX and `text/*`. Other files match by file name only.
+
+**Auth:** `Authorization: Bearer <JWT>`
+
+**Who:** members of the team. Only channels the user [can read](#access) are searched.
+
+**Query:** the same as [GET /search](#get-search): `team_id`, `q`, `in`, `from`, `before`, `after`,
+`limit`, `cursor`
+
+**Response 200**
+```json
+{
+  "results": [
+    {
+      "attachment": {
+        "file_id": "f6…",
+        "filename": "sunset.jpg",
+        "mime": "image/jpeg",
+        "size": 482133
+      },
+      "message": { "id": "9f3a…", "channel_id": "42aa…", "seq": 108, "...": "as in GET /search" },
+      "highlight": "<mark>red</mark>, orange, sky, sunset"
+    }
+  ],
+  "next_cursor": null
+}
+```
+- `message` is the message the file was sent with. Open it with `around_seq`
+- `highlight` shows the matched words from the file name, labels or text
+- Sorted by relevance, then newest first. Files of deleted messages are never returned
+
+**Errors:** the same as [GET /search](#get-search)
 
 ---
 
