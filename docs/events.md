@@ -75,6 +75,7 @@ Every channel event has the same shape everywhere: on the WebSocket, in the answ
 - `seq` is only unique inside one channel. Two channels can both have `seq: 5`.
 - The same event is never changed after it is written. A correction is a new event (for example `message.edited`).
 - One exception: deleting a message clears `body` and `mentions` in that message's earlier `message.created` and `message.edited` events, in the same transaction, so the deleted text can't be read back through `GET /channels/{channel_id}/events` or `POST /sync`. Their `seq`, `type` and the rest of the payload stay. Events already sent over the WebSocket can't be taken back.
+  It also clears the quote of the deleted message in later replies: `payload.message.reply_to` of their `message.created` events gets `body: ""` and `deleted: true`.
 
 ---
 
@@ -194,6 +195,7 @@ A channel event inside a wrapper.
 { "type": "unread", "channel_id": "42aa…", "unread": 0, "mentions": 0 }
 ```
 - The new counts of one channel. Sent to the user's other tabs and devices after [POST /channels/{channel_id}/read](api-chat.md#post-channels-channel_id-read). `unread` is capped at 100 (the UI shows 99+).
+- `mentions` counts replies to my messages too, as in [GET /unread](api-chat.md#get-unread).
 - How it reaches every tab: after the commit, chatty-chat publishes it on the Redis pub/sub channel `chat.users:{user_id}`. Each gateway subscribes to `chat.users:{user_id}` while it holds at least one
   socket of that user, and unsubscribes when the last one closes. Exact channels only, never `PSUBSCRIBE chat.users:*`, so a gateway gets only its own users' messages.
 
@@ -263,6 +265,7 @@ A message was sent.
       "attachments": [
         { "file_id": "f6…", "filename": "report.pdf", "mime": "application/pdf", "size": 482133 }
       ],
+      "reply_to": null,
       "mentions": ["u3…"],
       "reactions": [],
       "pinned": false,
@@ -277,6 +280,7 @@ A message was sent.
 - `payload.message` is the full [message object](api-chat.md#message-object). `message.seq` is the same number as the event's `seq`.
 - The author's app uses `message.client_msg_id` to replace its pending copy, so the message doesn't show twice when this event arrives before the POST response.
 - `reactions` is always empty and has no `me`, because the same event goes to everyone.
+- `message.reply_to` is the quote of the replied message, as in the [message object](api-chat.md#message-object), taken when the message is sent. A later edit of the replied message doesn't change it here (the web app updates it from `message.edited`); a delete clears it ([the event envelope](#envelope)).
 - The web app adds the message to the channel. If it already has the message from the REST answer of its own send (same `id`), it keeps one copy.
 
 <a id="event-message-edited"></a>
@@ -298,6 +302,7 @@ The text of a message changed.
 ```
 - Sent by: [PUT /messages/{message_id}](api-chat.md#put-messages-message_id)
 - `body` and `mentions` replace the old values. Files can't change.
+- The web app also updates `reply_to.body` of the loaded replies to this message.
 
 <a id="event-message-deleted"></a>
 ## message.deleted
@@ -318,6 +323,7 @@ A message was deleted (soft delete).
 - Sent by: [DELETE /messages/{message_id}](api-chat.md#delete-messages-message_id)
 - `deleted_by` can be the author, the channel owner or a team owner or admin.
 - The web app shows the message as deleted, removes its files, reactions and mentions, and removes it from the pins. There is no separate `pin.removed` for that.
+- The web app also shows the quote in the loaded replies to this message as deleted.
 - The message's earlier `message.created` and `message.edited` events lose their `body` and `mentions` in the stored history ([the event envelope](#envelope)), so a later sync shows no deleted text.
 
 <a id="event-reaction-added"></a>
