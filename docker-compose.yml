@@ -267,6 +267,37 @@ services:
       redis:
         condition: service_healthy
 
+  # Attachment labeler (CHAT-299), labeler stage of chatty-chat's Dockerfile: reads unlabeled
+  # attachments from MinIO and saves colors, labels and text for search (Phase 3 adds the job).
+  # Not started by `docker compose up -d` until then: run it with --profile labeler.
+  labeler:
+    build:
+      context: ../chatty-chat
+      target: labeler
+    image: chatty-chat-labeler:dev
+    container_name: chatty-labeler
+    command: python -m app.jobs.label_attachments
+    profiles: [labeler]
+    env_file:
+      - path: ../chatty-chat/.env
+        required: false
+    environment:
+      # Service names and ports inside the network; these win over chatty-chat/.env.
+      DATABASE_URL: postgresql+asyncpg://${CHAT_DB_USER:-chat_user}:${CHAT_DB_PASSWORD:-chat_pass}@chat-db:5432/${CHAT_DB_NAME:-chat_db}
+      # Required by chatty-chat's settings, even though the labeler never calls chatty-core.
+      CORE_SERVICE_TOKEN: ${CORE_SERVICE_TOKEN:-change-me}
+      MINIO_ACCESS_KEY: ${CHAT_MINIO_ACCESS_KEY:-chatty-chat}
+      MINIO_SECRET_KEY: ${CHAT_MINIO_SECRET_KEY:-change-me}
+      MINIO_BUCKET: chatty
+    volumes:
+      - ../chatty-chat:/app
+    restart: unless-stopped
+    depends_on:
+      chat:
+        condition: service_healthy  # chat's start applies the migrations, the label columns included
+      minio:
+        condition: service_healthy
+
 volumes:
   core-db-data:
   chat-db-data:
