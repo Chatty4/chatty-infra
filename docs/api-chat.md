@@ -184,6 +184,13 @@ Returned by the message endpoints and inside `message.created` events.
   "attachments": [
     { "file_id": "f6…", "filename": "report.pdf", "mime": "application/pdf", "size": 482133 }
   ],
+  "reply_to": {
+    "id": "77c1…",
+    "seq": 104,
+    "author_id": "u3…",
+    "body": "is v1.4 ready?",
+    "deleted": false
+  },
   "mentions": ["u3…"],
   "reactions": [
     { "emoji": "👍", "count": 2, "me": true }
@@ -199,8 +206,11 @@ Returned by the message endpoints and inside `message.created` events.
 - `body`: a mention is stored as `<@user_id>`. The web app shows the display name from chatty-core's [team members](api-core.md#get-teams-team_id-members).
 - `mentions`: the mentioned users who are members of the channel. Mentions of other users stay in the text but are not in this list.
 - `attachments`: what chatty-core's `attach` returned (D-03), in the order they were sent. They have no URL: get short-lived download URLs with [GET /messages/{message_id}/attachments](#get-messages-message_id-attachments) when the message is shown.
+- `reply_to`: `null`, or the message this one replies to, as it is now (an edit of it shows here too):
+  - `body`: its first 200 characters. An empty `body` with `deleted: false` is a message with only files: every message has text or files, and an edit can empty the text only when there are files
+  - `deleted`: it was deleted. Then `body` is `""`; `id`, `seq` and `author_id` stay, so the web app can still show who wrote it
 - `reactions`: one entry per emoji; `me` is true if the current user reacted with it.
-- A deleted message keeps its `id` and `seq` (so the order doesn't change) but has `body: ""`, empty `file_ids`, `attachments`, `mentions` and `reactions`, and `deleted_at` set.
+- A deleted message keeps its `id` and `seq` (so the order doesn't change) but has `body: ""`, empty `file_ids`, `attachments`, `mentions` and `reactions`, `reply_to: null`, and `deleted_at` set.
 
 ---
 
@@ -219,12 +229,14 @@ Send a message. A retry with the same `client_msg_id` returns the original messa
 {
   "client_msg_id": "c1b2e0a4-…",
   "body": "deploy at 5? <@u3…>",
-  "file_ids": ["f6…"]
+  "file_ids": ["f6…"],
+  "reply_to_id": "77c1…"
 }
 ```
 - `client_msg_id`: a UUID made by the web app for this message. The same value on a retry returns the original, even if the channel was archived or its team deleted since. The same value already used for a message in another channel returns `400 validation_error` with `fields.client_msg_id: "already_used"`
 - `body`: 1–4000 chars, required unless `file_ids` is not empty. The body isn't trimmed, so a body of only spaces counts as text
 - `file_ids`: max 10, each must be a `ready` attachment uploaded by the sender in the channel's team ([upload in chatty-core](api-core.md#post-files))
+- `reply_to_id`: optional. A message of this channel to reply to; it must exist and not be deleted. The reply shows a quote of it (`reply_to` in the [message object](#message-object)). A retry with the same `client_msg_id` returns the original without checking `reply_to_id` again
 - Before saving, chatty-chat calls chatty-core's `attach` once for all the files (D-03). If one file fails, none is attached and nothing is saved: the user can remove that file and send again
 - If saving fails after the files were attached, they are deleted (D-03). A retry with the same `client_msg_id` then gets `invalid_file`: upload the files again (the web app can do it by itself if it still has them) and send with the new `file_ids`
 
@@ -240,6 +252,13 @@ Send a message. A retry with the same `client_msg_id` returns the original messa
   "attachments": [
     { "file_id": "f6…", "filename": "report.pdf", "mime": "application/pdf", "size": 482133 }
   ],
+  "reply_to": {
+    "id": "77c1…",
+    "seq": 104,
+    "author_id": "u3…",
+    "body": "is v1.4 ready?",
+    "deleted": false
+  },
   "mentions": ["u3…"],
   "reactions": [],
   "pinned": false,
@@ -253,18 +272,19 @@ Send a message. A retry with the same `client_msg_id` returns the original messa
 **Errors**
 | Status | code | When |
 |---|---|---|
-| 400 | `validation_error` | body empty without files, body too long, more than 10 files or the same file twice, `client_msg_id` already used in another channel |
+| 400 | `validation_error` | body empty without files, body too long, more than 10 files or the same file twice, `client_msg_id` already used in another channel, `reply_to_id` not a message of this channel (`fields.reply_to_id: "invalid"`) |
 | 400 | `invalid_file` | a file doesn't exist or was deleted, is not `ready`, not the sender's, of another team or already in a message; `message` names the file. No file of the message is attached |
 | 403 | `not_a_member` | user is not in the channel |
 | 404 | `channel_not_found` | channel does not exist |
 | 409 | `channel_archived` | channel is archived or its team was deleted |
+| 409 | `message_deleted` | the message in `reply_to_id` was deleted |
 | 429 | `rate_limited` | more than 60 messages per minute; `Retry-After` says when to try again |
 
 ---
 
 <a id="put-messages-message_id"></a>
 ## PUT /messages/{message_id}
-Edit the text of my message. `body` is the only editable field, so the request always sends it. Files can't be changed.
+Edit the text of my message. `body` is the only editable field, so the request always sends it. Files can't be changed, and neither can the message it replies to.
 
 **Auth:** `Authorization: Bearer <JWT>`
 
@@ -296,7 +316,7 @@ Edit the text of my message. `body` is the only editable field, so the request a
 
 <a id="delete-messages-message_id"></a>
 ## DELETE /messages/{message_id}
-Delete a message. It is a soft delete: the message stays in its place as "deleted", its pins are removed, and after the commit chatty-chat calls chatty-core's `detach` once for all its files (D-03). Its text is also cleared from its earlier `message.created` and `message.edited` events, so [GET /channels/{channel_id}/events](#get-channels-channel_id-events) and [POST /sync](#post-sync) don't return it ([events.md, the event envelope](events.md#envelope)).
+Delete a message. It is a soft delete: the message stays in its place as "deleted", its pins are removed, and after the commit chatty-chat calls chatty-core's `detach` once for all its files (D-03). Its text is also cleared from its earlier `message.created` and `message.edited` events, so [GET /channels/{channel_id}/events](#get-channels-channel_id-events) and [POST /sync](#post-sync) don't return it ([events.md, the event envelope](events.md#envelope)). Replies to it stay. Their `reply_to` shows `deleted: true` and loses its text, also in their stored `message.created` events.
 
 **Auth:** `Authorization: Bearer <JWT>`
 
@@ -343,6 +363,7 @@ Message history, newest first, for scrolling up.
       "body": "deploy at 5? <@u3…>",
       "file_ids": [],
       "attachments": [],
+      "reply_to": null,
       "mentions": ["u3…"],
       "reactions": [{ "emoji": "👍", "count": 2, "me": true }],
       "pinned": false,
@@ -614,6 +635,7 @@ Pinned messages of a channel, newest pin first. Not paginated: max 100 pins per 
         "body": "deploy at 5? <@u3…>",
         "file_ids": [],
         "attachments": [],
+        "reply_to": null,
         "mentions": ["u3…"],
         "reactions": [],
         "pinned": true,
@@ -733,7 +755,7 @@ when the user switches team, and after every WebSocket reconnect.
 }
 ```
 - `unread`: messages after my read position that are not mine and not deleted. Capped at 100; the UI shows 99+
-- `mentions`: unread messages that mention me
+- `mentions`: unread messages that mention me or reply to one of my messages. A message that does both counts once
 - Channels with nothing unread are included with `0`, so the web app can clear badges
 
 **Errors**
@@ -774,6 +796,7 @@ Full-text search in the messages of one team. *Post-MVP*
         "body": "deploy at 5? <@u3…>",
         "file_ids": [],
         "attachments": [],
+        "reply_to": null,
         "mentions": ["u3…"],
         "reactions": [],
         "pinned": false,
@@ -961,18 +984,20 @@ What the push worker sends to a browser for a new message. The payload is encryp
   "message_id": "9f3a…",
   "seq": 108,
   "mentioned": true,
+  "replied": false,
   "preview": "deploy at 5? <@u3…>"
 }
 ```
 - `preview`: the first 100 characters of the body; empty for a message with only attachments.
   Mentions stay as `<@user_id>`; the service worker shows a generic text if it can't resolve them.
 - `mentioned`: the user is in the message's `mentions`.
+- `replied`: the message replies to one of the user's messages. The service worker shows "New reply to your message"; "You were mentioned" wins when both are true.
 - `team_id`: the channel's team, so a click can open `/teams/{team_id}/channels/{channel_id}` in the web
   app, which loads the message with REST as after a reconnect.
 
 **Who gets one**, for each `message.created` event:
 - a member of the channel who isn't the author and hasn't muted it, and
-- whose `notify_level` is `all`, or `mentions` and they are mentioned (DMs default to `all`), and
+- whose `notify_level` is `all`, or `mentions` and they are mentioned or the message replies to one of their messages (DMs default to `all`), and
 - who is active (`is_active` in [memberships](api-internal.md#get-internal-users-user_id-memberships)), and
 - who has no Chatty tab on screen (`visible` heartbeat in the last 45 s).
 - One push per user and message, to every browser they subscribed. Events older than 10 minutes are
