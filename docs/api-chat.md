@@ -187,7 +187,6 @@ Returned by the message endpoints and inside `message.created` events.
     "seq": 104,
     "author_id": "u3…",
     "body": "is v1.4 ready?",
-    "has_files": false,
     "deleted": false
   },
   "mentions": ["u3…"],
@@ -206,9 +205,8 @@ Returned by the message endpoints and inside `message.created` events.
 - `mentions`: the mentioned users who are members of the channel. Mentions of other users stay in the text but are not in this list.
 - `attachments`: what chatty-core's `attach` returned (D-03), in the order they were sent. They have no URL: get short-lived download URLs with [GET /messages/{message_id}/attachments](#get-messages-message_id-attachments) when the message is shown.
 - `reply_to`: `null`, or the message this one replies to, as it is now (an edit of it shows here too):
-  - `body`: its first 200 characters
-  - `has_files`: it has attachments
-  - `deleted`: it was deleted. Then `body` is `""` and `has_files` is `false`; `id`, `seq` and `author_id` stay, so the web app can still show who wrote it
+  - `body`: its first 200 characters. An empty `body` with `deleted: false` is a message with only files: every message has text or files, and an edit can empty the text only when there are files
+  - `deleted`: it was deleted. Then `body` is `""`; `id`, `seq` and `author_id` stay, so the web app can still show who wrote it
 - `reactions`: one entry per emoji; `me` is true if the current user reacted with it.
 - A deleted message keeps its `id` and `seq` (so the order doesn't change) but has `body: ""`, empty `file_ids`, `attachments`, `mentions` and `reactions`, `reply_to: null`, and `deleted_at` set.
 
@@ -257,7 +255,6 @@ Send a message. A retry with the same `client_msg_id` returns the original messa
     "seq": 104,
     "author_id": "u3…",
     "body": "is v1.4 ready?",
-    "has_files": false,
     "deleted": false
   },
   "mentions": ["u3…"],

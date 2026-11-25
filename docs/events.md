@@ -75,7 +75,7 @@ Every channel event has the same shape everywhere: on the WebSocket, in the answ
 - `seq` is only unique inside one channel. Two channels can both have `seq: 5`.
 - The same event is never changed after it is written. A correction is a new event (for example `message.edited`).
 - One exception: deleting a message clears `body` and `mentions` in that message's earlier `message.created` and `message.edited` events, in the same transaction, so the deleted text can't be read back through `GET /channels/{channel_id}/events` or `POST /sync`. Their `seq`, `type` and the rest of the payload stay. Events already sent over the WebSocket can't be taken back.
-  It also clears the quote of the deleted message in later replies: `payload.message.reply_to` of their `message.created` events gets `body: ""`, `has_files: false` and `deleted: true`.
+  It also clears the quote of the deleted message in later replies: `payload.message.reply_to` of their `message.created` events gets `body: ""` and `deleted: true`.
 
 ---
 
