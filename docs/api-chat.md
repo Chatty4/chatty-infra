@@ -137,7 +137,7 @@ Limits are per user, counted in Redis in fixed windows of one minute (one second
 | [GET /channels/{channel_id}/events](#get-channels-channel_id-events) | 120 / min |
 | [POST /sync](#post-sync) | 20 / min |
 | [GET /search](#get-search) | 30 / min |
-| [GET /search/attachments](#get-search-attachments) (post-MVP) | `cursor` → `next_cursor`, as in [api-core.md](api-core.md#pagination) | default 20, max 50 |
+| [GET /search/attachments](#get-search-attachments) (post-MVP) | 30 / min |
 | [POST](#post-push-subscriptions) and [DELETE](#delete-push-subscriptions) `/push/subscriptions` | 10 / min together |
 | WebSocket `watch` | 1 / s per socket; more are ignored without an `error` |
 | [GET /messages/{message_id}/attachments](#get-messages-message_id-attachments), [GET /channels/{channel_id}/pins](#get-channels-channel_id-pins), [GET /unread](#get-unread), [GET /teams/{team_id}/presence](#get-teams-team_id-presence), `heartbeat`, `/health` | no limit |
@@ -154,6 +154,8 @@ Lists that can grow without limit are paginated. Messages and events already hav
 | [GET /channels/{channel_id}/messages](#get-channels-channel_id-messages) | `before_seq` → `has_more`; newest first | default 50, max 100 |
 | [GET /channels/{channel_id}/events](#get-channels-channel_id-events) | `after_seq` → `has_more`; oldest first | default 500, max 500 |
 | [GET /search](#get-search) (post-MVP) | `cursor` → `next_cursor`, as in [api-core.md](api-core.md#pagination) | default 20, max 50 |
+| [GET /search/attachments](#get-search-attachments) (post-MVP) | `cursor` → `next_cursor`, as in [api-core.md](api-core.md#pagination) | default 20, max 50 |
+
 
 - `seq` cursors are stable: new messages or deleted ones never shift a page, because a page is "everything before / after this number".
 - The next page always starts from the last `seq` of the current one: the smallest for messages, the biggest for events.
