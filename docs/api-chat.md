@@ -31,6 +31,7 @@ Source: the chatty-chat Confluence page (sections 5 and 8) and `docs/decisions.m
 **Read state and search**
 - [POST /channels/{channel_id}/read](#post-channels-channel_id-read)
 - [GET /unread](#get-unread)
+- [GET /channels/{channel_id}/reads](#get-channels-channel_id-reads)
 - [GET /search](#get-search) (post-MVP)
 - [GET /search/attachments](#get-search-attachments) (post-MVP)
 
@@ -135,6 +136,7 @@ Limits are per user, counted in Redis in fixed windows of one minute (one second
 | [POST /channels/{channel_id}/read](#post-channels-channel_id-read) | 120 / min |
 | [GET /channels/{channel_id}/messages](#get-channels-channel_id-messages) | 120 / min |
 | [GET /channels/{channel_id}/events](#get-channels-channel_id-events) | 120 / min |
+| [GET /channels/{channel_id}/reads](#get-channels-channel_id-reads) | 120 / min |
 | [POST /sync](#post-sync) | 20 / min |
 | [GET /search](#get-search) | 30 / min |
 | [GET /search/attachments](#get-search-attachments) (post-MVP) | 30 / min |
@@ -164,6 +166,7 @@ Not paginated, because their size has a limit:
 - [POST /sync](#post-sync): max 500 channels per call and max 500 events per channel. More returns `gap_too_large` for that channel, and the web app reloads it with the paginated history.
 - [GET /channels/{channel_id}/pins](#get-channels-channel_id-pins): max 100 pins per channel.
 - [GET /unread](#get-unread): one row per channel the user is in, in one team; the sidebar needs all of them.
+- [GET /channels/{channel_id}/reads](#get-channels-channel_id-reads): one row per member of a private channel or DM; the seen-by list needs all of them.
 
 ---
 
@@ -268,6 +271,7 @@ Send a message. A retry with the same `client_msg_id` returns the original messa
 }
 ```
 - Also sends a [message.created](#event-message-created) event to everyone who can read the channel, and moves the sender's read position to this `seq`
+- In a private channel or DM, the moved read position is also sent as a [read](events.md#ws-read) message on the WebSocket (D-19). A retry sends none
 
 **Errors**
 | Status | code | When |
@@ -722,6 +726,7 @@ Mark the channel as read up to `seq`. The read position only moves forward, so a
 }
 ```
 - The new counts are also sent as an `unread` message on the WebSocket to the user's other tabs and devices. A tab that was disconnected gets the counts from GET /unread after it reconnects.
+- In a private channel or DM, when `last_read_seq` moved forward, the new position is also sent as a [read](events.md#ws-read) message to the channel's sockets, for read receipts (D-19). Nothing is sent when it didn't move.
 
 **Errors**
 | Status | code | When |
@@ -763,6 +768,41 @@ when the user switches team, and after every WebSocket reconnect.
 |---|---|---|
 | 400 | `validation_error` | `team_id` missing |
 | 403 | `not_a_team_member` | the user is not in the team |
+
+---
+
+<a id="get-channels-channel_id-reads"></a>
+## GET /channels/{channel_id}/reads
+The read position of every member of a private channel or DM, for read receipts (D-19). Called when the web app opens the channel and after every WebSocket reconnect; between those, [read](events.md#ws-read) messages keep it up to date.
+
+**Auth:** `Authorization: Bearer <JWT>`
+
+**Who:** members of the channel. Archived channels and channels of a deleted team still answer.
+
+**Response 200**
+```json
+{
+  "channel_id": "42aa…",
+  "last_seq": 120,
+  "reads": [
+    { "user_id": "u3…", "last_read_seq": 118 },
+    { "user_id": "u7…", "last_read_seq": 120 },
+    { "user_id": "u9…", "last_read_seq": 0 }
+  ]
+}
+```
+- `reads`: one row per current member of the channel (from chatty-core), the caller included, in no fixed order. A member who never read the channel has `last_read_seq: 0`
+- `last_seq`: the channel's last `seq` when the positions were read
+- A member has seen a message when their `last_read_seq` is at least the message's `seq`. The author of a message is not counted. Which messages show ticks is up to the web app: only the user's own
+- Not paginated: one row per member
+
+**Errors**
+| Status | code | When |
+|---|---|---|
+| 400 | `read_receipts_unavailable` | the channel is public; read receipts are only in private channels and DMs |
+| 403 | `not_a_member` | user is not in the channel |
+| 404 | `channel_not_found` | channel does not exist |
+| 429 | `rate_limited` | more than 120 requests per minute; `Retry-After` says when to try again |
 
 ---
 
@@ -1063,6 +1103,9 @@ GET /api/chat/v1/ws?token=eyJhbGciOiJSUzI1NiIs…
 { "type": "unread", "channel_id": "42aa…", "unread": 0, "mentions": 0 }
 ```
 ```json
+{ "type": "read", "channel_id": "42aa…", "user_id": "u3…", "last_read_seq": 118 }
+```
+```json
 { "type": "channel.updated", "channel_id": "42aa…", "name": "releases", "topic": "Release notes", "archived": false }
 ```
 ```json
@@ -1071,6 +1114,7 @@ GET /api/chat/v1/ws?token=eyJhbGciOiJSUzI1NiIs…
 - `event`: one channel event, see [events](#events)
 - `typing`: sent to the channel's sockets and the sockets that `watch` it, except the typing user's own. The web app hides it after 5 s
 - `presence`: `online` or `offline`, sent to the members of each team the user is in, only when it changes. For who is online now, see [GET /teams/{team_id}/presence](#get-teams-team_id-presence)
+- `read`: a member's read position moved forward in a private channel or DM, for read receipts (D-19). Sent to the channel's sockets. For the positions now, see [GET /channels/{channel_id}/reads](#get-channels-channel_id-reads)
 - `channel.updated`: forwarded from chatty-core so the sidebar refreshes
 - `error`: a client message was rejected; the socket stays open
 
@@ -1108,7 +1152,7 @@ Every change in a channel is one event with the next `seq` of that channel. The 
 }
 ```
 
-**Client rule:** ignore if `seq` <= last seen. If `seq` > last seen + 1, call [GET /channels/{channel_id}/events](#get-channels-channel_id-events) with `after_seq` = last seen. After a reconnect, call [POST /sync](#post-sync) and [GET /unread](#get-unread). The full rules are in [events.md](events.md#client-rules).
+**Client rule:** ignore if `seq` <= last seen. If `seq` > last seen + 1, call [GET /channels/{channel_id}/events](#get-channels-channel_id-events) with `after_seq` = last seen. After a reconnect, call [POST /sync](#post-sync) and [GET /unread](#get-unread), and [GET /channels/{channel_id}/reads](#get-channels-channel_id-reads) for an open private channel or DM. The full rules are in [events.md](events.md#client-rules).
 
 <a id="event-message-created"></a>
 ## message.created

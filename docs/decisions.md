@@ -259,3 +259,47 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
   python-magic (needs the libmagic system library in Docker, in CI and on Windows, for formats a
   blocklist doesn't need).
 - **Plan impact:** CHAT-166 (+0.5 day). `api-core.md`: `POST /files` and `confirm`.
+
+## D-19: Read receipts in private channels and DMs
+- **Status:** proposed
+- **Decision:**
+  - Read receipts exist only in private channels and DMs. They are always on: there is no setting,
+    per channel or per user. Public channels have none.
+  - They are computed from what chatty-chat already stores: a member has seen a message when their
+    `read_state.last_read_seq` is at least the message's `seq`. A member without a read position
+    has seen nothing. The author is never counted.
+  - "Everyone" means the channel's current members, from chatty-core's
+    [GET /internal/channels/{channel_id}](api-internal.md). People who left drop out; people who
+    joined later count as not having seen older messages until they read them.
+  - The web app shows the ticks only on the user's own messages, with a list of who has seen the
+    message and who hasn't.
+  - Live updates: when a member's read position moves forward in a private channel or DM
+    ([POST /channels/{channel_id}/read](api-chat.md#post-channels-channel_id-read), or sending a
+    message, which moves the sender's position), chatty-chat publishes a
+    [read](events.md#ws-read) message on the Redis pub/sub channel `chat.reads:{channel_id}`, after
+    the commit. Gateways subscribe to it together with `chat.events:{channel_id}` and
+    `chat.typing:{channel_id}`. Nothing is published when the position didn't move.
+  - `read` is a live message, like `typing` and `unread`: no `seq`, never stored, never in Kafka.
+    The web app gets the current positions from
+    [GET /channels/{channel_id}/reads](api-chat.md#get-channels-channel_id-reads) when it opens the
+    channel and after every reconnect, so a lost `read` is fixed.
+- **Why:** the read position and the channel's `seq` already say who read up to where, so no new
+  table is needed. A position only moves forward, so the newest value always wins and nothing has
+  to be replayed. In private channels and DMs everyone who can read is a member with a read
+  position, so "seen by everyone" is true. In a public channel any team member can read without
+  joining and has no read position, so the counts would be wrong, and the audience can be the
+  whole team.
+- **Rejected:**
+  - `read` as a channel event with a `seq` (every read would take the channel's counter lock,
+    go to Kafka and the push worker, and be replayed by `POST /sync`);
+  - a setting per channel for owners and admins (DMs have no owner, and it would need a new field
+    in chatty-core, its events and its internal API);
+  - a table with one row per member and message (rows grow with members × messages, and the read
+    position already holds the same information);
+  - sending `read` on `chat.typing:{channel_id}` (one subscription fewer, but one handler for two
+    kinds of message).
+- **Not covered:** a "delivered" tick (needs an acknowledgement from each device); a per-user
+  setting to hide one's own read receipts. Either can be added later without changing this one.
+- **Plan impact:** chatty-chat (`read` publish, gateway subscription,
+  `GET /channels/{channel_id}/reads`) and chatty-web (ticks, seen-by list). No change in
+  chatty-core. `api-chat.md` and `events.md` change.
