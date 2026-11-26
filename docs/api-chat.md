@@ -825,18 +825,19 @@ Full-text search in the messages of one team. *Post-MVP*
 <a id="get-search-attachments"></a>
 ## GET /search/attachments
 Search the attachments of one team by what is in them: file name, colors and objects in images,
-text in images, and text in documents. *Post-MVP*
+text in images, and text in documents. Without `q`, lists the newest files. *Post-MVP*
 
 Files are labeled in the background, so a new attachment can take a few minutes to show up.
 Labeled types: images (`image/png`, `image/jpeg`, `image/webp`, `image/gif`), PDF, DOCX, XLSX,
-PPTX and `text/*`. Other files match by file name only.
+PPTX and `text/*`. Other files match by file name only. 
 
 **Auth:** `Authorization: Bearer <JWT>`
 
 **Who:** members of the team. Only channels the user [can read](#access) are searched.
 
 **Query:** the same as [GET /search](#get-search): `team_id`, `q`, `in`, `from`, `before`, `after`,
-`limit`, `cursor`
+`limit`, `cursor`, except that `q` is optional. Without it, every file is returned, labeled or not:
+with `in`, this is a conversation's "files" list
 
 **Response 200**
 ```json
@@ -857,8 +858,9 @@ PPTX and `text/*`. Other files match by file name only.
 }
 ```
 - `message` is the message the file was sent with. Open it with `around_seq`
-- `highlight` shows the matched words from the file name, labels or text
-- Sorted by relevance, then newest first. Files of deleted messages are never returned
+- `highlight` shows the matched words from the file name, labels or text; `""` without `q`
+- With `q`: sorted by relevance, then newest first. Without `q`: newest first. Files of deleted
+  messages are never returned
 
 **Errors:** the same as [GET /search](#get-search)
 
