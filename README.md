@@ -92,6 +92,29 @@ creates it from the files in `minio/`, and it is safe to run again:
   Production sets `MINIO_API_CORS_ALLOW_ORIGIN` to the web app's origin.
 - Changed a file in `minio/`? Run `setup.bat --yes` again.
 
+## Deploy (server)
+
+The server (Linux with Docker) has the repos cloned side by side, like a laptop. `deploy.sh` pulls
+them, rebuilds and replaces only what changed, and checks that it answers:
+
+```bash
+cd ~/chatty/chatty-infra
+bash deploy.sh              # what changed in the pull
+bash deploy.sh chat web     # these, changed or not: infra, core, chat, web
+bash deploy.sh all          # everything
+```
+
+- Once: copy `deploy.env.example` to `deploy.env` and fill in the web container's settings.
+- A repo with local changes stops the deploy before anything is replaced; so does a failed build.
+- chat, relay and push-worker share one image and are always rebuilt together. Migrations run when
+  the chat and core containers start; the script prints chat's current one.
+- `docker compose restart` doesn't pick up new code: the containers run images built from it.
+- The labeler isn't deployed (it needs more memory than the server has). Run it on a laptop through
+  an SSH tunnel: `ssh -N -L 15432:127.0.0.1:5433 -L 19000:127.0.0.1:9000 <server>`, then
+  `docker run --rm --env-file <chatty-chat>/.env.prod-labeler chatty-chat-labeler:dev`, with
+  `DATABASE_URL` and `MINIO_INTERNAL_URL` on `host.docker.internal` and a database user that can
+  only update the label columns.
+
 ## Contracts
 
 The API contracts, events and decisions shared by chatty-core and chatty-chat live in `docs/`. Change

@@ -1,4 +1,5 @@
 .env
+deploy.env
 backups/
 
 # Editor settings are personal (sessions.json used to auto-run git checkout/pull in every repo).
