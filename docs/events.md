@@ -38,7 +38,7 @@ There are two kinds of messages. Only the first kind is an event.
 
 | | Channel events | Live messages |
 |---|---|---|
-| Examples | `message.created`, `reaction.added`, `pin.removed` | `typing`, `presence`, `unread`, `channel.updated` |
+| Examples | `message.created`, `reaction.added`, `pin.removed` | `typing`, `presence`, `unread`, `read`, `channel.updated` |
 | Has a `seq` | yes, the next number of its channel | no |
 | Stored | yes, in the `channel_events` table (30 days) | no, sent once and forgotten |
 | WebSocket | yes, inside `{"type": "event", …}` | yes, as a message of its own |
@@ -97,6 +97,7 @@ The web app keeps one number per channel: the last `seq` it has applied (`last_s
 2. Call [POST /sync](api-chat.md#post-sync) with `last_seen` of every channel the web app has open.
 3. Apply the returned events of each channel in order, then release the held-back ones (the duplicate rule drops the ones already applied).
 4. Call [GET /unread](api-chat.md#get-unread) for the current team. `unread` messages are not stored, so the ones sent while the socket was closed are lost.
+5. If a private channel or DM is open, call [GET /channels/{channel_id}/reads](api-chat.md#get-channels-channel_id-reads) for it. `read` messages are not stored either.
 
 **When the answer says the gap is too big**
 - `POST /sync` returns `gap_too_large: true` for a channel, or `GET …/events` returns `409 gap_too_large`. This happens when more than 500 events are missing, or they are older than 30 days.
@@ -106,7 +107,7 @@ The web app keeps one number per channel: the last `seq` it has applied (`last_s
 - A channel the web app never opened has no `last_seen`. It is loaded with the history endpoint, not with sync.
 - An event about a message the web app doesn't have (for example `message.edited` for a message that is far up in the history) is ignored but still moves `last_seen`. The message comes from the history endpoint when the user scrolls to it.
 - A reaction event moves `count`. `me` changes only when `payload.user_id` is the current user.
-- `typing`, `presence`, `unread` and `channel.updated` have no `seq`, so none of these rules apply to them.
+- `typing`, `presence`, `unread`, `read` and `channel.updated` have no `seq`, so none of these rules apply to them.
 
 ---
 
@@ -198,6 +199,18 @@ A channel event inside a wrapper.
 - `mentions` counts replies to my messages too, as in [GET /unread](api-chat.md#get-unread).
 - How it reaches every tab: after the commit, chatty-chat publishes it on the Redis pub/sub channel `chat.users:{user_id}`. Each gateway subscribes to `chat.users:{user_id}` while it holds at least one
   socket of that user, and unsubscribes when the last one closes. Exact channels only, never `PSUBSCRIBE chat.users:*`, so a gateway gets only its own users' messages.
+
+<a id="ws-read"></a>
+### read
+```json
+{ "type": "read", "channel_id": "42aa…", "user_id": "u3…", "last_read_seq": 118 }
+```
+- A member's read position moved forward, for read receipts ([D-19](decisions.md)). Only in private channels and DMs; never for a public channel.
+- Sent after [POST /channels/{channel_id}/read](api-chat.md#post-channels-channel_id-read) moved the position, and after [POST /channels/{channel_id}/messages](api-chat.md#post-channels-channel_id-messages) moved the sender's (not on a retry). Nothing is sent when the position didn't move.
+- `user_id` is the member whose position moved; `last_read_seq` is the stored position, after the commit.
+- Sent to the channel's sockets, the reader's own included. Private channels and DMs can't be watched, so no watcher gets it.
+- The web app keeps the highest `last_read_seq` per member and ignores a lower one: a `read` can arrive after a newer answer of [GET /channels/{channel_id}/reads](api-chat.md#get-channels-channel_id-reads).
+- How it reaches them: chatty-chat publishes it on the Redis pub/sub channel `chat.reads:{channel_id}`. A gateway subscribes to it together with `chat.events:{channel_id}` and `chat.typing:{channel_id}`, while it holds a socket in the channel. Never stored, so a missed one is gone; the web app calls `GET /channels/{channel_id}/reads` after every reconnect.
 
 
 <a id="ws-channel-updated"></a>
@@ -406,7 +419,7 @@ Every channel event is also written to Kafka, for the services that are not the 
 | Python client | `aiokafka` |
 | Created by | `setup.bat` (chatty-infra). Auto-create is off, so writing to a missing topic is an error, not a new topic |
 
-- Only [channel events](#where) are written. `typing`, `presence`, `unread` and `channel.updated` never go to Kafka.
+- Only [channel events](#where) are written. `typing`, `presence`, `unread`, `read` and `channel.updated` never go to Kafka.
 - The REST history keeps events for 30 days, Kafka for 7. The web app recovers with REST, never with Kafka.
 
 **How an event gets there (outbox relay)**
