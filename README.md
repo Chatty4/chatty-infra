@@ -104,7 +104,9 @@ bash deploy.sh chat web     # these, changed or not: infra, core, chat, web
 bash deploy.sh all          # everything
 ```
 
-- Once: copy `deploy.env.example` to `deploy.env` and fill in the web container's settings.
+- It uses `docker-compose.yml` plus the server's own `docker-compose.prod.yml` (the web app, Caddy and
+  production settings, not in git), like every `docker compose` command on the server should:
+  `export COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml` in the shell does the same.
 - A repo with local changes stops the deploy before anything is replaced; so does a failed build.
 - chat, relay and push-worker share one image and are always rebuilt together. Migrations run when
   the chat and core containers start; the script prints chat's current one.
