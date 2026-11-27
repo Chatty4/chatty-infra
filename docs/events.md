@@ -282,6 +282,7 @@ A message was sent.
       "mentions": ["u3…"],
       "reactions": [],
       "pinned": false,
+      "forwarded": false,
       "edited_at": null,
       "deleted_at": null,
       "created_at": "2026-10-05T14:02:11Z"
@@ -293,6 +294,7 @@ A message was sent.
 - `payload.message` is the full [message object](api-chat.md#message-object). `message.seq` is the same number as the event's `seq`.
 - The author's app uses `message.client_msg_id` to replace its pending copy, so the message doesn't show twice when this event arrives before the POST response.
 - `reactions` is always empty and has no `me`, because the same event goes to everyone.
+- `message.forwarded` is true for a forward (D-20). Its `author_id` is the person who forwarded it; nothing in the event names the original author or channel. Its `mentions` is always empty, so the push worker sends no mention notification for it.
 - `message.reply_to` is the quote of the replied message, as in the [message object](api-chat.md#message-object), taken when the message is sent. A later edit of the replied message doesn't change it here (the web app updates it from `message.edited`); a delete clears it ([the event envelope](#envelope)).
 - The web app adds the message to the channel. If it already has the message from the REST answer of its own send (same `id`), it keeps one copy.
 

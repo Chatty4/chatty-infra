@@ -261,7 +261,7 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
 - **Plan impact:** CHAT-166 (+0.5 day). `api-core.md`: `POST /files` and `confirm`.
 
 ## D-19: Read receipts in private channels and DMs
-- **Status:** proposed
+- **Status:** accepted
 - **Decision:**
   - Read receipts exist only in private channels and DMs. They are always on: there is no setting,
     per channel or per user. Public channels have none.
@@ -303,3 +303,47 @@ Status values: `proposed`, `accepted`, `rejected`, `replaced by D-xx`.
 - **Plan impact:** chatty-chat (`read` publish, gateway subscription,
   `GET /channels/{channel_id}/reads`) and chatty-web (ticks, seen-by list). No change in
   chatty-core. `api-chat.md` and `events.md` change.
+
+## D-20: Forwarding messages
+- **Status:** accepted
+- **Decision:**
+  - A user can forward a message they [can read](api-chat.md#access) to a channel or DM they can
+    write in, in the same team. The web app sends to at most 5 destinations, one request each.
+  - A forward is a new message, sent by the person who forwards it, with a copy of the original's
+    `body` and files. The reply, reactions, pins and edits are not copied. Later edits or a delete
+    of the original don't change the forward; deleting the forward doesn't touch the original.
+  - It is marked only as forwarded (`forwarded: true`). The original author, channel and date are
+    never shown: not in the API, the events or the push.
+  - `mentions` is empty on a forward, so nobody gets a mention notification. The `<@user_id>` text
+    stays in the body. Otherwise the push is the same as for any message.
+  - A forward of a forward is just another forward: there is nothing more to carry over.
+  - It uses the send endpoint: [POST /channels/{channel_id}/messages](api-chat.md#post-channels-channel_id-messages)
+    with `forward_of`. Retries by `client_msg_id`, `seq`, the outbox, events and push work as for
+    any message.
+  - Files are copied by chatty-core with [POST /internal/files/copy](api-internal.md#post-internal-files-copy),
+    called where `attach` would be (D-03): before the message transaction, with `detach` of the
+    copies if saving fails. The copies are new files, already attached, with their own MinIO
+    objects. chatty-chat copies the source's labels and content into the new `attachments` rows,
+    so the labeler skips them.
+  - chatty-chat keeps the source message's ID in `messages.forwarded_from_id`, only for tracing.
+    The API never returns it.
+- **Why:** the destination can have people who weren't in the original conversation, so the
+  forward has to carry its own content, and showing who wrote it, or where, would expose that
+  person and that channel without their consent. Copying files keeps D-03 and D-17 as they are:
+  every file is in exactly one message, and `detach` of one message never removes another
+  message's file. Same team only, because files belong to a team (`wrong_team`), and content
+  shouldn't leave the team it was written in.
+- **Rejected:**
+  - a link to the original instead of a copy (people in the destination may not be able to read
+    the source, and an edit or delete would change what they saw);
+  - showing the original author, channel or date;
+  - one file shared by several messages with a reference count (`detach`, the cleanup job and
+    the D-17 lock would all change);
+  - one endpoint with several destinations (it would need an answer for partial failures; five
+    sends do the same with the rules that already exist);
+  - forwarding to another team.
+- **Not covered:** forwarding several messages at once; a per-user setting to forbid forwarding
+  one's messages. Either can be added later.
+- **Plan impact:** chatty-core (`POST /internal/files/copy`), chatty-chat (`forward_of` on send,
+  `forwarded_from_id`, `forwarded` in the message object) and chatty-web (forward dialog,
+  "Forwarded" label). `api-chat.md`, `api-internal.md` and `events.md` change.

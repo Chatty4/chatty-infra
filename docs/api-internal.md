@@ -4,7 +4,7 @@ Base URL: `/internal` · Auth: `X-Service-Token: <token>` · IDs: `uuid` · Time
 
 Endpoints that chatty-core exposes for chatty-chat only. They are not reachable from the internet. The public endpoints are in [api-core.md](api-core.md).
 
-Source: the chatty-core Confluence page (section 4, internal endpoints) and `docs/decisions.md` (D-02, D-03, D-07). If this file and the page disagree, fix one of them in the same pull request.
+Source: the chatty-core Confluence page (section 4, internal endpoints) and `docs/decisions.md` (D-02, D-03, D-07, D-20). If this file and the page disagree, fix one of them in the same pull request.
 
 ## Endpoints
 
@@ -15,6 +15,7 @@ Source: the chatty-core Confluence page (section 4, internal endpoints) and `doc
 **Files**
 - [POST /internal/files/attach](#post-internal-files-attach)
 - [POST /internal/files/detach](#post-internal-files-detach)
+- [POST /internal/files/copy](#post-internal-files-copy)
 
 **Health**
 - [GET /health](#get-health)
@@ -64,7 +65,7 @@ Every error has the same body as in [api-core.md](api-core.md#common-errors):
 | 401 | `invalid_service_token` | missing or wrong `X-Service-Token` |
 | 500 | `internal_error` | a bug; the response has a `request_id` to find it in the logs |
 
-The errors below each endpoint are only the ones specific to it. One exception to the body: the file errors of [attach](#post-internal-files-attach) also have `fields.file_id`, the file that failed.
+The errors below each endpoint are only the ones specific to it. One exception to the body: the file errors of [attach](#post-internal-files-attach) and [copy](#post-internal-files-copy) also have `fields.file_id`, the file that failed.
 
 ---
 
@@ -293,6 +294,78 @@ Called when a message with files is deleted, or when saving a message failed aft
 | 400 | `validation_error` | `file_ids` empty, more than 10 or with duplicates; an ID is not a UUID |
 
 - If this call fails, chatty-chat retries it later. If it is lost, the files only stay attached but unused, which is harmless.
+
+---
+
+<a id="post-internal-files-copy"></a>
+## POST /internal/files/copy
+Called **before** chatty-chat saves a forward of a message with files, once for all its files (D-20), where a normal send would call [attach](#post-internal-files-attach). chatty-core copies each file into a new file of the destination channel's team, already attached. The originals are not changed. Each message then has its own files, so a [detach](#post-internal-files-detach) of one message never removes another message's file.
+
+**Auth:** `X-Service-Token: <token>`
+
+**Who:** chatty-chat `api`, once per forward, while handling `POST /channels/{channel_id}/messages` with `forward_of`
+
+**Request**
+```json
+{
+  "user_id": "u7…",
+  "channel_id": "c8…",
+  "file_ids": ["f6…", "f9…"]
+}
+```
+- `user_id`: the person who forwards the message. The copies are recorded as uploaded by them
+- `channel_id`: the channel the forward is sent to
+- `file_ids`: 1–10 different file IDs, the files of the source message in its order
+- chatty-chat checks that the user can read the source message before calling. chatty-core doesn't know messages, so it doesn't check who sent the originals
+
+**Response 200**: the same shape as [attach](#post-internal-files-attach), for the new files
+```json
+{
+  "attachments": [
+    {
+      "file_id": "a2…",
+      "object_key": "attachments/t1…/a2…",
+      "filename": "report.pdf",
+      "mime": "application/pdf",
+      "size": 482133,
+      "attached_at": "2026-11-27T10:15:00Z"
+    }
+  ]
+}
+```
+- One entry per file, in the order of `file_ids`. `file_id` and `object_key` are new; `filename`, `mime` and `size` are the original's.
+
+**Checks**
+
+The channel first, then the files in the order of `file_ids`, each one with these checks in this order. The first check that fails is the answer, and nothing is created.
+1. The file exists and was not deleted.
+2. Its purpose is `attachment`.
+3. Its `team_id` is the team of `channel_id`.
+4. It is attached (it is in a sent message).
+
+**How it copies**
+- chatty-core locks the source rows (sorted by ID), the same lock as `attach`, `DELETE /files/{file_id}` and the cleanup job (D-17), so a file deleted at the same moment is either seen by the checks or waits for them.
+- It copies each object inside MinIO (server-side copy, nothing is downloaded) to `attachments/{team_id}/{new_file_id}`, then creates the new file rows in one transaction: purpose `attachment`, status `ready`, uploaded by `user_id`, `attached_at` now.
+- If a copy or the transaction fails, it deletes the objects it already copied and answers with the error. No new file is left behind.
+
+**Errors**
+
+For the file errors, `fields.file_id` names the source file that failed, as for [attach](#post-internal-files-attach).
+
+| Status | code | When |
+|---|---|---|
+| 400 | `validation_error` | `file_ids` empty, more than 10 or with duplicates; an ID is not a UUID |
+| 404 | `channel_not_found` | no channel with this ID, or its team was deleted |
+| 404 | `file_not_found` | no file with this ID, or it was deleted |
+| 400 | `wrong_purpose` | the file is an avatar or a team icon |
+| 400 | `wrong_team` | the file belongs to another team than the channel |
+| 409 | `file_not_attached` | the file is not in a message |
+| 503 | `storage_unavailable` | MinIO could not be reached; nothing was created |
+
+- chatty-chat checks `client_msg_id` before calling `copy`, so a retried forward returns the original forward instead of copying again.
+- A failed call creates nothing, so chatty-chat has nothing to undo. A source file that was deleted meanwhile (`file_not_found`) means the source message was deleted: chatty-chat answers `404 message_not_found`.
+- chatty-chat undoes a copy only when it answered `200`: if saving the forward then fails, it calls [detach](#post-internal-files-detach) for the new files.
+- If the outcome is unknown (timeout, lost response), chatty-chat undoes nothing. The copies may stay attached to no message, the same as for `attach`; a retry copies the originals again.
 
 ---
 
