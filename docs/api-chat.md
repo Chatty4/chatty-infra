@@ -199,6 +199,7 @@ Returned by the message endpoints and inside `message.created` events.
     { "emoji": "👍", "count": 2, "me": true }
   ],
   "pinned": false,
+  "forwarded": false,
   "edited_at": null,
   "deleted_at": null,
   "created_at": "2026-10-05T14:02:11Z"
@@ -213,6 +214,7 @@ Returned by the message endpoints and inside `message.created` events.
   - `body`: its first 200 characters. An empty `body` with `deleted: false` is a message with only files: every message has text or files, and an edit can empty the text only when there are files
   - `deleted`: it was deleted. Then `body` is `""`; `id`, `seq` and `author_id` stay, so the web app can still show who wrote it
 - `reactions`: one entry per emoji; `me` is true if the current user reacted with it.
+- `forwarded`: the message was forwarded from another message (D-20). `author_id` is the person who forwarded it. The original author, channel and date are never returned.
 - A deleted message keeps its `id` and `seq` (so the order doesn't change) but has `body: ""`, empty `file_ids`, `attachments`, `mentions` and `reactions`, `reply_to: null`, and `deleted_at` set.
 
 ---
@@ -240,8 +242,10 @@ Send a message. A retry with the same `client_msg_id` returns the original messa
 - `body`: 1–4000 chars, required unless `file_ids` is not empty. The body isn't trimmed, so a body of only spaces counts as text
 - `file_ids`: max 10, each must be a `ready` attachment uploaded by the sender in the channel's team ([upload in chatty-core](api-core.md#post-files))
 - `reply_to_id`: optional. A message of this channel to reply to; it must exist and not be deleted. The reply shows a quote of it (`reply_to` in the [message object](#message-object)). A retry with the same `client_msg_id` returns the original without checking `reply_to_id` again
+- `forward_of`: optional. Forward this message here (D-20). The user must [be able to read](#access) its channel, which must be in the same team as this one. With `forward_of`, `body`, `file_ids` and `reply_to_id` must be empty or missing: the new message gets a copy of the source's `body` and files, empty `mentions`, no `reply_to`, and `forwarded: true`. A retry with the same `client_msg_id` returns the original without checking `forward_of` again
 - Before saving, chatty-chat calls chatty-core's `attach` once for all the files (D-03). If one file fails, none is attached and nothing is saved: the user can remove that file and send again
 - If saving fails after the files were attached, they are deleted (D-03). A retry with the same `client_msg_id` then gets `invalid_file`: upload the files again (the web app can do it by itself if it still has them) and send with the new `file_ids`
+- A forward with files calls chatty-core's [copy](api-internal.md#post-internal-files-copy) instead of `attach`, at the same point. If saving then fails, the copies are deleted; the source's files are never touched, so a retry copies them again
 
 **Response 201** (200 if it was a retry): a [message object](#message-object)
 ```json
@@ -265,6 +269,7 @@ Send a message. A retry with the same `client_msg_id` returns the original messa
   "mentions": ["u3…"],
   "reactions": [],
   "pinned": false,
+  "forwarded": false,
   "edited_at": null,
   "deleted_at": null,
   "created_at": "2026-10-05T14:02:11Z"
@@ -276,10 +281,12 @@ Send a message. A retry with the same `client_msg_id` returns the original messa
 **Errors**
 | Status | code | When |
 |---|---|---|
-| 400 | `validation_error` | body empty without files, body too long, more than 10 files or the same file twice, `client_msg_id` already used in another channel, `reply_to_id` not a message of this channel (`fields.reply_to_id: "invalid"`) |
+| 400 | `validation_error` | body empty without files, body too long, more than 10 files or the same file twice, `client_msg_id` already used in another channel, `reply_to_id` not a message of this channel (`fields.reply_to_id: "invalid"`), `forward_of` together with `body`, `file_ids` or `reply_to_id` (`fields.forward_of: "invalid"`) |
 | 400 | `invalid_file` | a file doesn't exist or was deleted, is not `ready`, not the sender's, of another team or already in a message; `message` names the file. No file of the message is attached |
+| 400 | `forward_wrong_team` | the message in `forward_of` is in another team than this channel |
 | 403 | `not_a_member` | user is not in the channel |
 | 404 | `channel_not_found` | channel does not exist |
+| 404 | `message_not_found` | the message in `forward_of` doesn't exist, was deleted, or the user can't read its channel |
 | 409 | `channel_archived` | channel is archived or its team was deleted |
 | 409 | `message_deleted` | the message in `reply_to_id` was deleted |
 | 429 | `rate_limited` | more than 60 messages per minute; `Retry-After` says when to try again |
@@ -371,6 +378,7 @@ Message history, newest first, for scrolling up.
       "mentions": ["u3…"],
       "reactions": [{ "emoji": "👍", "count": 2, "me": true }],
       "pinned": false,
+      "forwarded": false,
       "edited_at": null,
       "deleted_at": null,
       "created_at": "2026-10-05T14:02:11Z"
@@ -643,6 +651,7 @@ Pinned messages of a channel, newest pin first. Not paginated: max 100 pins per 
         "mentions": ["u3…"],
         "reactions": [],
         "pinned": true,
+        "forwarded": false,
         "edited_at": null,
         "deleted_at": null,
         "created_at": "2026-10-05T14:02:11Z"
@@ -840,6 +849,7 @@ Full-text search in the messages of one team. *Post-MVP*
         "mentions": ["u3…"],
         "reactions": [],
         "pinned": false,
+        "forwarded": false,
         "edited_at": null,
         "deleted_at": null,
         "created_at": "2026-10-05T14:02:11Z"
